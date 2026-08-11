@@ -20,6 +20,7 @@ export function Nav({ ctaHref, ctaLabel }: NavProps) {
     { href: "/for-productions", label: t.nav.forProductions },
     { href: "/talent-discovery", label: t.nav.talentDiscovery },
     { href: "/projects", label: t.nav.projects },
+    { href: "/portal", label: t.nav.portal },
     { href: "/#about", label: t.nav.about },
   ];
 

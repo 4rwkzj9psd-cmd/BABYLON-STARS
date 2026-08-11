@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { Badge, TextInput, goldBtn } from "@/components/ui/FormPrimitives";
@@ -152,6 +153,12 @@ export function ProjectsView() {
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {loading && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-dim)", fontSize: 13.5, padding: "20px 0" }}>
+            <Loader2 className="spin" size={16} />
+            {p.loading}
+          </div>
+        )}
         {!loading && briefs.length === 0 && <div style={{ color: "var(--text-dim)", fontSize: 13.5 }}>{p.noProjects}</div>}
         {briefs.map((b) => {
           const mine = proposals.find((pr) => pr.brief_id === b.id);

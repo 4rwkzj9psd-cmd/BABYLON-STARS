@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight, Check, Camera, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
@@ -68,6 +69,7 @@ export function TalentApplication() {
   const [form, setForm] = useState<FormState>(initialForm);
   const [talentId, setTalentId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const totalSteps = 5;
 
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -84,17 +86,31 @@ export function TalentApplication() {
     return age < 18;
   })();
 
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
+  const emailTouched = form.email.length > 0;
+
   const canProceed = () => {
-    if (step === 0) return form.firstName && form.lastName && form.dob && form.email && form.city;
+    if (step === 0) return form.firstName && form.lastName && form.dob && form.email && isValidEmail && form.city;
     if (step === 1) return form.categories.length > 0;
     if (step === 2) return !!form.photoFile;
     if (step === 4) return form.consent1 && form.consent2;
     return true;
   };
 
+  const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
+
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setPhotoError(a.photoTypeError);
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoError(a.photoSizeError);
+      return;
+    }
+    setPhotoError(null);
     update("photoFile", file);
     const reader = new FileReader();
     reader.onload = () => update("photoPreview", reader.result as string);
@@ -187,6 +203,10 @@ export function TalentApplication() {
             <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 10, lineHeight: 1.5 }}>{a.talentIdNotice}</p>
           </div>
         )}
+        <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginTop: 20, lineHeight: 1.5 }}>{a.goToPortal}</p>
+        <Link href="/portal" className="btn btn-line" style={{ marginTop: 12, display: "inline-flex" }}>
+          {a.goToPortalBtn}
+        </Link>
       </div>
     );
   }
@@ -232,7 +252,15 @@ export function TalentApplication() {
           )}
           <div style={row2}>
             <Field label={a.email}>
-              <TextInput value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="ime@email.com" />
+              <TextInput
+                value={form.email}
+                onChange={(e) => update("email", e.target.value)}
+                placeholder="ime@email.com"
+                style={emailTouched && !isValidEmail ? { borderColor: "var(--red)" } : undefined}
+              />
+              {emailTouched && !isValidEmail && (
+                <div style={{ fontSize: 11.5, color: "var(--red)", marginTop: 5 }}>{a.invalidEmail}</div>
+              )}
             </Field>
             <Field label={a.phone}>
               <TextInput value={form.phone} onChange={(e) => update("phone", e.target.value)} placeholder="+386 ..." />
@@ -305,6 +333,7 @@ export function TalentApplication() {
             )}
             <input type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
           </label>
+          {photoError && <div style={{ fontSize: 12.5, color: "var(--red)", marginTop: 8 }}>{photoError}</div>}
           <div style={{ marginTop: 20 }}>
             <Field label={a.video}>
               <TextInput value={form.video} onChange={(e) => update("video", e.target.value)} placeholder="https://..." />
