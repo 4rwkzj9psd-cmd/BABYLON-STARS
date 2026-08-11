@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { Nav } from "@/components/layout/Nav";
 import { Footer } from "@/components/layout/Footer";
+import { GlobeIcon, ProfileIcon, ClapperIcon, HandshakeIcon } from "@/components/ui/Icons";
 import styles from "./page.module.css";
 
 export default function TalentDiscoveryPage() {
@@ -38,22 +39,30 @@ export default function TalentDiscoveryPage() {
           </div>
           <div className={styles.expectGrid}>
             <div className={styles.expectItem}>
-              <div className={styles.expectIcon}>🌍</div>
+              <div className={styles.expectIcon}>
+                <GlobeIcon size={19} />
+              </div>
               <h4>{td.expect1t}</h4>
               <p>{td.expect1d}</p>
             </div>
             <div className={styles.expectItem}>
-              <div className={styles.expectIcon}>✦</div>
+              <div className={styles.expectIcon}>
+                <ProfileIcon size={19} />
+              </div>
               <h4>{td.expect2t}</h4>
               <p>{td.expect2d}</p>
             </div>
             <div className={styles.expectItem}>
-              <div className={styles.expectIcon}>🎬</div>
+              <div className={styles.expectIcon}>
+                <ClapperIcon size={19} />
+              </div>
               <h4>{td.expect3t}</h4>
               <p>{td.expect3d}</p>
             </div>
             <div className={styles.expectItem}>
-              <div className={styles.expectIcon}>🤝</div>
+              <div className={styles.expectIcon}>
+                <HandshakeIcon size={19} />
+              </div>
               <h4>{td.expect4t}</h4>
               <p>{td.expect4d}</p>
             </div>

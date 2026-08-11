@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { Nav } from "@/components/layout/Nav";
 import { Footer } from "@/components/layout/Footer";
+import { ClapperIcon, SearchIcon, HandshakeIcon, NetworkIcon } from "@/components/ui/Icons";
 import styles from "./page.module.css";
 
 export default function ForProductionsPage() {
@@ -36,22 +37,30 @@ export default function ForProductionsPage() {
           <h2>{fp.servicesTitle}</h2>
           <div className={styles.servicesGrid}>
             <div className={styles.serviceCard}>
-              <div className="ic">🎬</div>
+              <div className="ic">
+                <ClapperIcon size={21} />
+              </div>
               <h4>{fp.s1t}</h4>
               <p>{fp.s1d}</p>
             </div>
             <div className={styles.serviceCard}>
-              <div className="ic">🔍</div>
+              <div className="ic">
+                <SearchIcon size={21} />
+              </div>
               <h4>{fp.s2t}</h4>
               <p>{fp.s2d}</p>
             </div>
             <div className={styles.serviceCard}>
-              <div className="ic">🤝</div>
+              <div className="ic">
+                <HandshakeIcon size={21} />
+              </div>
               <h4>{fp.s3t}</h4>
               <p>{fp.s3d}</p>
             </div>
             <div className={styles.serviceCard}>
-              <div className="ic">🌐</div>
+              <div className="ic">
+                <NetworkIcon size={21} />
+              </div>
               <h4>{fp.s4t}</h4>
               <p>{fp.s4d}</p>
             </div>

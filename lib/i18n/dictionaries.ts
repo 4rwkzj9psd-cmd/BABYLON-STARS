@@ -124,7 +124,7 @@ export const dictionaries = {
       statusSelected: "Izbran/-a",
       statusRejected: "Ni izbran/-a",
       selectedMsg: (title: string, prod: string) =>
-        `🎉 Izbran/-a si bil/-a za "${title}" — ${prod} te bo kmalu kontaktiral.`,
+        `Izbran/-a si bil/-a za "${title}" — ${prod} te bo kmalu kontaktiral.`,
       rejectedMsg: (title: string) =>
         `Tokrat nisi bil/-a izbran/-a za "${title}". Tvoj profil ostaja aktiven za prihodnje projekte.`,
     },
@@ -333,7 +333,7 @@ export const dictionaries = {
       statusProposed: "In the running",
       statusSelected: "Selected",
       statusRejected: "Not selected",
-      selectedMsg: (title: string, prod: string) => `🎉 You were selected for "${title}" — ${prod} will contact you soon.`,
+      selectedMsg: (title: string, prod: string) => `You were selected for "${title}" — ${prod} will contact you soon.`,
       rejectedMsg: (title: string) => `You weren't selected for "${title}" this time. Your profile stays active for future projects.`,
     },
     apply: {

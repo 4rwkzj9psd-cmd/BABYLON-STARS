@@ -5,6 +5,19 @@ import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { Badge, TextInput, goldBtn } from "@/components/ui/FormPrimitives";
 
+function NotificationStar({ size = 13, color = "var(--red)" }: { size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      style={{ display: "inline-block", verticalAlign: -1, marginRight: 6 }}
+    >
+      <path fill={color} d="M50 2 L58 42 L98 50 L58 58 L50 98 L42 58 L2 50 L42 42 Z" />
+    </svg>
+  );
+}
+
 interface BriefRow {
   id: string;
   title: string;
@@ -130,6 +143,7 @@ export function ProjectsView() {
                   color: selected ? "var(--red)" : "var(--text-muted)",
                 }}
               >
+                {selected && <NotificationStar />}
                 {selected ? p.selectedMsg(brief.title, productionName(brief.production)) : p.rejectedMsg(brief.title)}
               </div>
             );
