@@ -1,0 +1,161 @@
+.hero {
+  position: relative;
+  padding: 130px 40px 90px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.hero img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.35;
+  filter: grayscale(30%);
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--bg) 35%, transparent 90%);
+}
+.heroInner {
+  position: relative;
+  z-index: 2;
+  max-width: 520px;
+}
+.eyebrow {
+  font-size: 11.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 22px;
+}
+.heroInner h1 {
+  font-family: var(--font-fraunces), serif;
+  font-weight: 500;
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1.18;
+  margin-bottom: 20px;
+}
+.heroInner p {
+  color: var(--text-light);
+  font-size: 15.5px;
+  margin-bottom: 30px;
+  line-height: 1.6;
+}
+.heroCtas {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.services {
+  padding: 80px 40px;
+  border-bottom: 1px solid var(--border);
+}
+.services > .wrap > h2 {
+  font-family: var(--font-fraunces), serif;
+  font-weight: 500;
+  font-size: 22px;
+  margin-bottom: 40px;
+  text-align: center;
+}
+.servicesGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.serviceCard {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 26px 20px;
+}
+.serviceCard .ic {
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+.serviceCard h4 {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.serviceCard p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+@media (max-width: 760px) {
+  .servicesGrid {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 20px;
+  }
+}
+
+.briefFlow {
+  padding: 80px 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+.briefFlow > .wrap > h2 {
+  font-family: var(--font-fraunces), serif;
+  font-weight: 500;
+  font-size: 22px;
+  margin-bottom: 40px;
+  text-align: center;
+}
+.flowRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  max-width: 820px;
+  margin: 0 auto;
+}
+.flowCard .n {
+  font-family: var(--font-fraunces), serif;
+  font-size: 34px;
+  color: var(--gold);
+  opacity: 0.6;
+  margin-bottom: 10px;
+}
+.flowCard h4 {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.flowCard p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+@media (max-width: 760px) {
+  .flowRow {
+    grid-template-columns: 1fr;
+    row-gap: 30px;
+  }
+}
+
+.ctaBand {
+  padding: 70px 40px;
+  text-align: center;
+}
+.ctaBand h3 {
+  font-family: var(--font-fraunces), serif;
+  font-weight: 500;
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+.ctaBand p {
+  color: var(--text-muted);
+  font-size: 14.5px;
+  margin-bottom: 26px;
+  max-width: 440px;
+  margin-left: auto;
+  margin-right: auto;
+}

@@ -1,0 +1,182 @@
+.hero {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+.heroCopy {
+  flex: 1;
+  min-width: 320px;
+  padding: 90px 40px 70px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.eyebrow {
+  font-size: 11.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 22px;
+}
+.heroCopy h1 {
+  font-family: var(--font-fraunces), serif;
+  font-weight: 500;
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.15;
+  max-width: 460px;
+  margin-bottom: 20px;
+}
+.heroCopy p.sub {
+  color: var(--text-muted);
+  font-size: 15.5px;
+  max-width: 400px;
+  margin-bottom: 34px;
+  line-height: 1.65;
+}
+.heroPhoto {
+  flex: 1;
+  min-width: 320px;
+  position: relative;
+  overflow: hidden;
+}
+.heroPhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  min-height: 480px;
+  filter: grayscale(15%) contrast(1.05);
+}
+.heroPhoto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--bg) 0%, transparent 18%);
+}
+@media (max-width: 860px) {
+  .hero {
+    flex-direction: column;
+  }
+  .heroPhoto img {
+    min-height: 300px;
+  }
+}
+
+.expect {
+  padding: 80px 40px;
+  border-bottom: 1px solid var(--border);
+}
+.expectHead {
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto 48px;
+}
+.expectHead h2 {
+  font-family: var(--font-fraunces), serif;
+  font-weight: 500;
+  font-size: 26px;
+  margin-bottom: 10px;
+}
+.expectHead p {
+  color: var(--text-muted);
+  font-size: 14.5px;
+}
+.expectGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.expectItem {
+  text-align: center;
+}
+.expectIcon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 16px;
+  border: 1px solid var(--border-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.expectItem h4 {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.expectItem p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+@media (max-width: 760px) {
+  .expectGrid {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 36px;
+  }
+}
+
+.applySteps {
+  padding: 80px 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+.applySteps h2 {
+  font-family: var(--font-fraunces), serif;
+  font-weight: 500;
+  font-size: 22px;
+  margin-bottom: 40px;
+  text-align: center;
+}
+.stepsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.stepCard .n {
+  font-family: var(--font-fraunces), serif;
+  font-size: 34px;
+  color: var(--gold);
+  opacity: 0.6;
+  margin-bottom: 10px;
+}
+.stepCard h4 {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.stepCard p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+@media (max-width: 760px) {
+  .stepsRow {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 30px;
+  }
+}
+
+.ctaBand {
+  padding: 60px 40px;
+  text-align: center;
+}
+.ctaBand h3 {
+  font-family: var(--font-fraunces), serif;
+  font-weight: 500;
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+.ctaBand p {
+  color: var(--text-muted);
+  font-size: 14.5px;
+  margin-bottom: 26px;
+}
