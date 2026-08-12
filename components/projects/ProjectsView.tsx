@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
-import { Badge, TextInput, goldBtn } from "@/components/ui/FormPrimitives";
+import { Badge, TextInput, goldBtn, ghostBtn } from "@/components/ui/FormPrimitives";
 
 function NotificationStar({ size = 13, color = "var(--red)" }: { size?: number; color?: string }) {
   return (
@@ -54,11 +56,16 @@ export function ProjectsView() {
   const p = t.projects;
 
   const [talentId, setTalentId] = useState("");
+  const [session, setSession] = useState<Session | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authTalent, setAuthTalent] = useState<{ id: string; name: string } | null>(null);
   const [briefs, setBriefs] = useState<BriefRow[]>([]);
   const [proposals, setProposals] = useState<ProposalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const effectiveTalentId = authTalent ? authTalent.id : talentId.trim();
 
   useEffect(() => {
     supabase
@@ -73,27 +80,55 @@ export function ProjectsView() {
       });
   }, []);
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setCheckingAuth(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setAuthTalent(null);
+      return;
+    }
+    supabase
+      .from("talent")
+      .select("id,first_name")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        const row = data?.[0];
+        setAuthTalent(row ? { id: row.id, name: row.first_name } : null);
+      });
+  }, [session]);
+
   const loadProposals = useCallback((id: string) => {
-    if (!id.trim()) {
+    if (!id) {
       setProposals([]);
       return;
     }
     supabase
       .from("proposal")
       .select("id,talent_id,brief_id,status,notified_at")
-      .eq("talent_id", id.trim())
+      .eq("talent_id", id)
       .then(({ data }) => setProposals((data as ProposalRow[] | null) ?? []));
   }, []);
 
   useEffect(() => {
-    loadProposals(talentId);
-  }, [talentId, loadProposals]);
+    loadProposals(effectiveTalentId);
+  }, [effectiveTalentId, loadProposals]);
 
   const applyToBrief = async (briefId: string) => {
     setError(null);
     setApplying(briefId);
     const { error: insertError } = await supabase.from("proposal").insert({
-      talent_id: talentId.trim(),
+      talent_id: effectiveTalentId,
       brief_id: briefId,
       origin: "talent",
     });
@@ -102,7 +137,11 @@ export function ProjectsView() {
       setError(insertError.message);
       return;
     }
-    loadProposals(talentId);
+    loadProposals(effectiveTalentId);
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
   };
 
   const statusLabel = (s: ProposalRow["status"]) =>
@@ -112,13 +151,31 @@ export function ProjectsView() {
 
   return (
     <div style={{ maxWidth: 820, margin: "0 auto", padding: "0 40px 90px" }}>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <label style={{ display: "block", fontSize: 12, color: "var(--text-dim)", marginBottom: 6 }}>{p.talentIdLabel}</label>
-          <TextInput value={talentId} onChange={(e) => setTalentId(e.target.value)} placeholder={p.talentIdPlaceholder} />
+      {!checkingAuth && authTalent && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 30, flexWrap: "wrap" }}>
+          <Badge color="var(--teal)" bg="var(--teal-bg)">{p.signedInAs(authTalent.name)}</Badge>
+          <button onClick={logout} style={{ ...ghostBtn, fontSize: 11, padding: "6px 12px" }}>
+            {p.notYou}
+          </button>
         </div>
-      </div>
-      <div style={{ fontSize: 11, color: "var(--placeholder)", marginBottom: 30 }}>{p.demoNote}</div>
+      )}
+
+      {!checkingAuth && !authTalent && (
+        <>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--text-dim)", marginBottom: 6 }}>{p.talentIdLabel}</label>
+              <TextInput value={talentId} onChange={(e) => setTalentId(e.target.value)} placeholder={p.talentIdPlaceholder} />
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--placeholder)", marginBottom: 12 }}>{p.demoNote}</div>
+          <div style={{ fontSize: 12, marginBottom: 30 }}>
+            <Link href="/portal" style={{ color: "var(--gold)" }}>
+              {p.orSignIn}
+            </Link>
+          </div>
+        </>
+      )}
 
       {error && (
         <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--red-bg)", borderRadius: 8, color: "var(--red)", fontSize: 13 }}>
@@ -172,7 +229,7 @@ export function ProjectsView() {
                 {productionName(b.production)} {b.deadline && `· ${p.deadline} ${b.deadline}`}
               </div>
               {b.description && <div style={{ fontSize: 13.5, color: "var(--text-muted)", marginBottom: 16, lineHeight: 1.55 }}>{b.description}</div>}
-              {!talentId.trim() ? (
+              {!effectiveTalentId ? (
                 <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{p.chooseFirst}</span>
               ) : mine ? (
                 <Badge color={STATUS_COLORS[mine.status].color} bg={STATUS_COLORS[mine.status].bg}>
