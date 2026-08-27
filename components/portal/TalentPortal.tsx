@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { Session } from "@supabase/supabase-js";
 import Link from "next/link";
-import { ChevronRight, MapPin, FileText, Loader2 } from "lucide-react";
+import { ChevronRight, MapPin, FileText, Loader2, Send, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { Badge, Field, TextInput, goldBtn, ghostBtn } from "@/components/ui/FormPrimitives";
@@ -37,6 +37,7 @@ interface ProposalRow {
   talent_id: string;
   status: "proposed" | "sent_to_production" | "selected" | "rejected";
   notified_at: string | null;
+  self_tape_url: string | null;
   brief: BriefInfo | BriefInfo[] | null;
 }
 
@@ -45,6 +46,23 @@ interface DocumentRow {
   type: "representation_agreement" | "project_contract" | "consent_form" | "guardian_consent" | "other";
   status: "draft" | "sent" | "signed" | "declined" | "expired";
   signed_file_url: string | null;
+  created_at: string;
+}
+
+interface AppointmentRow {
+  id: string;
+  type: "audition" | "callback" | "fitting" | "shoot" | "meeting" | "other";
+  status: "scheduled" | "confirmed" | "completed" | "cancelled";
+  starts_at: string;
+  location: string | null;
+  brief: { title: string } | { title: string }[] | null;
+}
+
+interface MessageRow {
+  id: string;
+  talent_id: string;
+  sender: "agency" | "talent";
+  body: string;
   created_at: string;
 }
 
@@ -110,6 +128,11 @@ function ProfileView({ session }: { session: Session }) {
   const [talents, setTalents] = useState<TalentRow[]>([]);
   const [proposals, setProposals] = useState<ProposalRow[]>([]);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
+  const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,16 +157,25 @@ function ProfileView({ session }: { session: Session }) {
 
     const ids = (ownTalents ?? []).map((t) => t.id);
     if (ids.length > 0) {
-      const [{ data: proposalData }, { data: documentData }] = await Promise.all([
+      const [{ data: proposalData }, { data: documentData }, { data: appointmentData }, { data: messageData }] = await Promise.all([
         supabase
           .from("proposal")
-          .select("id,talent_id,status,notified_at,brief(title,deadline,production(company_name))")
+          .select("id,talent_id,status,notified_at,self_tape_url,brief(title,deadline,production(company_name))")
           .in("talent_id", ids)
           .order("proposed_at", { ascending: false }),
         supabase.from("document").select("id,type,status,signed_file_url,created_at").in("talent_id", ids).order("created_at", { ascending: false }),
+        supabase
+          .from("appointment")
+          .select("id,type,status,starts_at,location,brief(title)")
+          .in("talent_id", ids)
+          .gte("starts_at", new Date().toISOString())
+          .order("starts_at", { ascending: true }),
+        supabase.from("message").select("*").in("talent_id", ids).order("created_at", { ascending: true }),
       ]);
       setProposals((proposalData as ProposalRow[]) ?? []);
       setDocuments((documentData as DocumentRow[]) ?? []);
+      setAppointments((appointmentData as AppointmentRow[]) ?? []);
+      setMessages((messageData as MessageRow[]) ?? []);
     }
     setLoading(false);
   }, [session]);
@@ -151,6 +183,38 @@ function ProfileView({ session }: { session: Session }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const talentId = talents[0]?.id;
+    if (!talentId) return;
+    const channel = supabase
+      .channel(`portal-messages-${talentId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "message", filter: `talent_id=eq.${talentId}` },
+        (payload) => {
+          setMessages((prev) => [...prev, payload.new as MessageRow]);
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [talents]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "nearest" });
+  }, [messages]);
+
+  const sendMessage = async () => {
+    const talentId = talents[0]?.id;
+    if (!talentId || !draft.trim()) return;
+    setSending(true);
+    const body = draft.trim();
+    setDraft("");
+    await supabase.from("message").insert({ talent_id: talentId, sender: "talent", body });
+    setSending(false);
+  };
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -250,17 +314,21 @@ function ProfileView({ session }: { session: Session }) {
               const production = brief ? one(brief.production) : null;
               const pst = PROPOSAL_STATUS_META[prop.status];
               return (
-                <div
-                  key={prop.id}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--bg-card)", borderRadius: 8, flexWrap: "wrap" }}
-                >
-                  <div style={{ flex: 1, minWidth: 160 }}>
-                    <div style={{ fontSize: 14, color: "var(--text)" }}>{brief?.title ?? "—"}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{production?.company_name}</div>
+                <div key={prop.id} style={{ background: "var(--bg-card)", borderRadius: 8, padding: "12px 14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 160 }}>
+                      <div style={{ fontSize: 14, color: "var(--text)" }}>{brief?.title ?? "—"}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{production?.company_name}</div>
+                    </div>
+                    <Badge color={pst.color} bg={pst.bg}>
+                      {ad.proposalStatus[prop.status]}
+                    </Badge>
                   </div>
-                  <Badge color={pst.color} bg={pst.bg}>
-                    {ad.proposalStatus[prop.status]}
-                  </Badge>
+                  {prop.self_tape_url && (
+                    <div style={{ marginTop: 10 }}>
+                      <SelfTape url={prop.self_tape_url} label={p.viewSelfTape} />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -268,7 +336,39 @@ function ProfileView({ session }: { session: Session }) {
         )}
       </section>
 
-      <section>
+      <section style={{ marginBottom: 32 }}>
+        <h2 style={{ fontFamily: "var(--font-fraunces), serif", fontSize: 17, fontWeight: 500, color: "var(--text)", marginBottom: 14 }}>
+          {p.myAppointments}
+        </h2>
+        {appointments.length === 0 ? (
+          <div style={{ fontSize: 13.5, color: "var(--text-dim)" }}>{p.noAppointments}</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {appointments.map((appt) => {
+              const brief = one(appt.brief);
+              const d = new Date(appt.starts_at);
+              return (
+                <div
+                  key={appt.id}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--bg-card)", borderRadius: 8, flexWrap: "wrap" }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "var(--text)" }}>
+                    <Clock size={13} color="var(--text-dim)" />
+                    {d.toLocaleDateString()} {d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  <Badge color="var(--text-light)" bg="var(--chip-bg)">
+                    {ad.appointmentType[appt.type]}
+                  </Badge>
+                  {brief && <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{brief.title}</span>}
+                  {appt.location && <span style={{ fontSize: 12, color: "var(--text-dim)" }}>· {appt.location}</span>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
         <h2 style={{ fontFamily: "var(--font-fraunces), serif", fontSize: 17, fontWeight: 500, color: "var(--text)", marginBottom: 14 }}>
           {p.myDocuments}
         </h2>
@@ -295,6 +395,44 @@ function ProfileView({ session }: { session: Session }) {
             ))}
           </div>
         )}
+      </section>
+
+      <section>
+        <h2 style={{ fontFamily: "var(--font-fraunces), serif", fontSize: 17, fontWeight: 500, color: "var(--text)", marginBottom: 14 }}>
+          {p.messages}
+        </h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflow: "auto", marginBottom: 12 }}>
+          {messages.length === 0 && <div style={{ fontSize: 13, color: "var(--text-dim)" }}>{ad.noMessages}</div>}
+          {messages.map((m) => (
+            <div
+              key={m.id}
+              style={{
+                alignSelf: m.sender === "talent" ? "flex-end" : "flex-start",
+                maxWidth: "75%",
+                background: m.sender === "talent" ? "var(--gold-dark-bg)" : "var(--bg-card)",
+                color: m.sender === "talent" ? "var(--gold)" : "var(--text-light)",
+                padding: "8px 12px",
+                borderRadius: 10,
+                fontSize: 13.5,
+                lineHeight: 1.5,
+              }}
+            >
+              {m.body}
+            </div>
+          ))}
+          <div ref={bottomRef} />
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <TextInput
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            placeholder={ad.messagePlaceholder}
+          />
+          <button onClick={sendMessage} disabled={sending || !draft.trim()} style={{ ...goldBtn, opacity: sending || !draft.trim() ? 0.6 : 1 }}>
+            <Send size={15} />
+          </button>
+        </div>
       </section>
     </div>
   );

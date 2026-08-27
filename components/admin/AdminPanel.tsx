@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { LayoutDashboard, Briefcase } from "lucide-react";
+import { LayoutDashboard, Briefcase, CalendarDays, MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { StarMark } from "@/components/layout/StarMark";
 import { ghostBtn } from "@/components/ui/FormPrimitives";
 import { TalentsView } from "./TalentsView";
 import { BriefsView } from "./BriefsView";
+import { AppointmentsView } from "./AppointmentsView";
+import { MessagesView } from "./MessagesView";
 
 function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
   return (
@@ -35,7 +37,7 @@ function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode; labe
 export function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const { t } = useI18n();
   const ad = t.admin;
-  const [tab, setTab] = useState<"talents" | "briefs">("talents");
+  const [tab, setTab] = useState<"talents" | "briefs" | "calendar" | "messages">("talents");
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -52,6 +54,8 @@ export function AdminPanel({ onLogout }: { onLogout: () => void }) {
           </div>
           <NavItem icon={<LayoutDashboard size={16} />} label={ad.talents} active={tab === "talents"} onClick={() => setTab("talents")} />
           <NavItem icon={<Briefcase size={16} />} label={ad.briefs} active={tab === "briefs"} onClick={() => setTab("briefs")} />
+          <NavItem icon={<CalendarDays size={16} />} label={ad.calendar} active={tab === "calendar"} onClick={() => setTab("calendar")} />
+          <NavItem icon={<MessageCircle size={16} />} label={ad.messages} active={tab === "messages"} onClick={() => setTab("messages")} />
         </div>
         <button onClick={logout} style={{ ...ghostBtn, fontSize: 11 }}>
           {ad.logout}
@@ -61,6 +65,8 @@ export function AdminPanel({ onLogout }: { onLogout: () => void }) {
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         {tab === "talents" && <TalentsView />}
         {tab === "briefs" && <BriefsView />}
+        {tab === "calendar" && <AppointmentsView />}
+        {tab === "messages" && <MessagesView />}
       </div>
     </div>
   );

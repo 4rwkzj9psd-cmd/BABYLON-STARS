@@ -40,6 +40,7 @@ export interface ProposalRow {
   origin: "agency" | "talent";
   status: "proposed" | "sent_to_production" | "selected" | "rejected";
   notified_at: string | null;
+  self_tape_url: string | null;
   talent?: TalentRow | TalentRow[] | null;
 }
 
@@ -56,6 +57,27 @@ export const PROPOSAL_STATUS_META: Record<ProposalRow["status"], { color: string
   sent_to_production: { color: "var(--teal)", bg: "var(--teal-bg)" },
   selected: { color: "var(--red)", bg: "var(--red-bg)" },
   rejected: { color: "var(--brown)", bg: "var(--brown-bg)" },
+};
+
+export interface AppointmentRow {
+  id: string;
+  talent_id: string;
+  brief_id: string | null;
+  type: "audition" | "callback" | "fitting" | "shoot" | "meeting" | "other";
+  status: "scheduled" | "confirmed" | "completed" | "cancelled";
+  starts_at: string;
+  ends_at: string | null;
+  location: string | null;
+  notes: string | null;
+  talent?: TalentRow | TalentRow[] | null;
+  brief?: BriefRow | BriefRow[] | null;
+}
+
+export const APPOINTMENT_STATUS_META: Record<AppointmentRow["status"], { color: string; bg: string }> = {
+  scheduled: { color: "var(--text-muted)", bg: "var(--chip-bg)" },
+  confirmed: { color: "var(--teal)", bg: "var(--teal-bg)" },
+  completed: { color: "var(--text-dim)", bg: "var(--bg-hover)" },
+  cancelled: { color: "var(--brown)", bg: "var(--brown-bg)" },
 };
 
 export function one<T>(v: T | T[] | null | undefined): T | null {

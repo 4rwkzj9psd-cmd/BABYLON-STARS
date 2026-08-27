@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, Video, Check } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { Badge, TextInput, goldBtn, ghostBtn } from "@/components/ui/FormPrimitives";
+import { SelfTape } from "@/components/ui/SelfTape";
 
 function NotificationStar({ size = 13, color = "var(--red)" }: { size?: number; color?: string }) {
   return (
@@ -36,6 +37,7 @@ interface ProposalRow {
   brief_id: string;
   status: "proposed" | "sent_to_production" | "selected" | "rejected";
   notified_at: string | null;
+  self_tape_url: string | null;
 }
 
 function productionName(p: BriefRow["production"]) {
@@ -64,6 +66,9 @@ export function ProjectsView() {
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [applyPanel, setApplyPanel] = useState<string | null>(null);
+  const [tapeUrl, setTapeUrl] = useState("");
+  const [uploadingTape, setUploadingTape] = useState(false);
 
   const effectiveTalentId = authTalent ? authTalent.id : talentId.trim();
 
@@ -115,7 +120,7 @@ export function ProjectsView() {
     }
     supabase
       .from("proposal")
-      .select("id,talent_id,brief_id,status,notified_at")
+      .select("id,talent_id,brief_id,status,notified_at,self_tape_url")
       .eq("talent_id", id)
       .then(({ data }) => setProposals((data as ProposalRow[] | null) ?? []));
   }, []);
@@ -124,6 +129,34 @@ export function ProjectsView() {
     loadProposals(effectiveTalentId);
   }, [effectiveTalentId, loadProposals]);
 
+  const openApplyPanel = (briefId: string) => {
+    setError(null);
+    setTapeUrl("");
+    setApplyPanel(briefId);
+  };
+
+  const handleTapeFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      setError(p.tapeTypeError);
+      return;
+    }
+    setUploadingTape(true);
+    setError(null);
+    const ext = file.name.split(".").pop();
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("talent-videos").upload(path, file);
+    setUploadingTape(false);
+    if (uploadError) {
+      setError(uploadError.message);
+      return;
+    }
+    const { data: publicUrlData } = supabase.storage.from("talent-videos").getPublicUrl(path);
+    setTapeUrl(publicUrlData.publicUrl);
+  };
+
   const applyToBrief = async (briefId: string) => {
     setError(null);
     setApplying(briefId);
@@ -131,12 +164,15 @@ export function ProjectsView() {
       talent_id: effectiveTalentId,
       brief_id: briefId,
       origin: "talent",
+      self_tape_url: tapeUrl.trim() || null,
     });
     setApplying(null);
     if (insertError) {
       setError(insertError.message);
       return;
     }
+    setApplyPanel(null);
+    setTapeUrl("");
     loadProposals(effectiveTalentId);
   };
 
@@ -232,11 +268,56 @@ export function ProjectsView() {
               {!effectiveTalentId ? (
                 <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{p.chooseFirst}</span>
               ) : mine ? (
-                <Badge color={STATUS_COLORS[mine.status].color} bg={STATUS_COLORS[mine.status].bg}>
-                  {statusLabel(mine.status)}
-                </Badge>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-start" }}>
+                  <Badge color={STATUS_COLORS[mine.status].color} bg={STATUS_COLORS[mine.status].bg}>
+                    {statusLabel(mine.status)}
+                  </Badge>
+                  {mine.self_tape_url && (
+                    <div style={{ maxWidth: 360, width: "100%" }}>
+                      <SelfTape url={mine.self_tape_url} label={p.viewSelfTape} />
+                    </div>
+                  )}
+                </div>
+              ) : applyPanel === b.id ? (
+                <div style={{ background: "var(--bg-hover)", borderRadius: 8, padding: 14, maxWidth: 420 }}>
+                  <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 8 }}>{p.selfTapeLabel}</div>
+                  <TextInput
+                    value={tapeUrl}
+                    onChange={(e) => setTapeUrl(e.target.value)}
+                    placeholder={p.selfTapePlaceholder}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <label
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 11.5,
+                      color: "var(--gold)",
+                      cursor: "pointer",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Video size={13} />
+                    {uploadingTape ? p.uploadingTape : tapeUrl ? p.tapeReady : p.uploadTape}
+                    {tapeUrl && !uploadingTape && <Check size={13} color="var(--teal)" />}
+                    <input type="file" accept="video/*" onChange={handleTapeFile} disabled={uploadingTape} style={{ display: "none" }} />
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      disabled={applying === b.id || uploadingTape}
+                      onClick={() => applyToBrief(b.id)}
+                      style={{ ...goldBtn, opacity: applying === b.id || uploadingTape ? 0.6 : 1 }}
+                    >
+                      {p.applyBtn}
+                    </button>
+                    <button onClick={() => setApplyPanel(null)} style={ghostBtn}>
+                      {p.cancelApply}
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <button disabled={applying === b.id} onClick={() => applyToBrief(b.id)} style={{ ...goldBtn, opacity: applying === b.id ? 0.6 : 1 }}>
+                <button onClick={() => openApplyPanel(b.id)} style={goldBtn}>
                   {p.applyBtn}
                 </button>
               )}

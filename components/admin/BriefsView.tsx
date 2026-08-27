@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { Badge, goldBtn, inputStyle } from "@/components/ui/FormPrimitives";
+import { SelfTape } from "@/components/ui/SelfTape";
 import { NewBriefForm } from "./NewBriefForm";
 import { BriefRow, ProposalRow, ProductionRow, PROPOSAL_STATUS_META, one } from "./types";
 
@@ -109,50 +110,46 @@ export function BriefsView() {
                         const talent = one(p.talent);
                         if (!talent) return null;
                         return (
-                          <div
-                            key={p.id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              padding: "8px 10px",
-                              background: "var(--bg-alt)",
-                              borderRadius: 8,
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            {talent.photo_url ? (
-                              <img src={talent.photo_url} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
-                            ) : (
-                              <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--chip-bg)" }} />
-                            )}
-                            <div style={{ flex: 1, fontSize: 13, color: "var(--text)" }}>
-                              {talent.first_name} {talent.last_name}
-                            </div>
-                            <span style={{ fontSize: 10.5, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                              {p.origin === "talent" ? "Prijava talenta" : "Predlog agencije"}
-                            </span>
-                            <select
-                              value={p.status}
-                              onChange={(e) => updateProposalStatus(p.id, e.target.value as ProposalRow["status"])}
-                              style={{ ...inputStyle, width: 150, padding: "4px 8px", fontSize: 12 }}
-                            >
-                              {Object.entries(ad.proposalStatus).map(([k, label]) => (
-                                <option key={k} value={k}>
-                                  {label}
-                                </option>
-                              ))}
-                            </select>
-                            {(p.status === "selected" || p.status === "rejected") &&
-                              (p.notified_at ? (
-                                <Badge color={PROPOSAL_STATUS_META[p.status].color} bg={PROPOSAL_STATUS_META[p.status].bg}>
-                                  {ad.notified}
-                                </Badge>
+                          <div key={p.id} style={{ background: "var(--bg-alt)", borderRadius: 8, padding: "8px 10px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                              {talent.photo_url ? (
+                                <img src={talent.photo_url} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
                               ) : (
-                                <button onClick={() => notify(p.id)} style={{ ...goldBtn, padding: "6px 12px", fontSize: 11 }}>
-                                  {ad.notify}
-                                </button>
-                              ))}
+                                <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--chip-bg)" }} />
+                              )}
+                              <div style={{ flex: 1, fontSize: 13, color: "var(--text)" }}>
+                                {talent.first_name} {talent.last_name}
+                              </div>
+                              <span style={{ fontSize: 10.5, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                                {p.origin === "talent" ? "Prijava talenta" : "Predlog agencije"}
+                              </span>
+                              <select
+                                value={p.status}
+                                onChange={(e) => updateProposalStatus(p.id, e.target.value as ProposalRow["status"])}
+                                style={{ ...inputStyle, width: 150, padding: "4px 8px", fontSize: 12 }}
+                              >
+                                {Object.entries(ad.proposalStatus).map(([k, label]) => (
+                                  <option key={k} value={k}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </select>
+                              {(p.status === "selected" || p.status === "rejected") &&
+                                (p.notified_at ? (
+                                  <Badge color={PROPOSAL_STATUS_META[p.status].color} bg={PROPOSAL_STATUS_META[p.status].bg}>
+                                    {ad.notified}
+                                  </Badge>
+                                ) : (
+                                  <button onClick={() => notify(p.id)} style={{ ...goldBtn, padding: "6px 12px", fontSize: 11 }}>
+                                    {ad.notify}
+                                  </button>
+                                ))}
+                            </div>
+                            {p.self_tape_url && (
+                              <div style={{ marginTop: 8, maxWidth: 320 }}>
+                                <SelfTape url={p.self_tape_url} label={ad.viewSelfTape} />
+                              </div>
+                            )}
                           </div>
                         );
                       })}
