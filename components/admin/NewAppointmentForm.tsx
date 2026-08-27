@@ -22,6 +22,7 @@ const TYPE_VALUES: AppointmentRow["type"][] = ["audition", "callback", "fitting"
 export function NewAppointmentForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
   const { t } = useI18n();
   const ad = t.admin;
+  const [mode, setMode] = useState<"single" | "slots">("single");
   const [talents, setTalents] = useState<TalentOption[]>([]);
   const [briefs, setBriefs] = useState<BriefOption[]>([]);
   const [talentId, setTalentId] = useState("");
@@ -30,6 +31,8 @@ export function NewAppointmentForm({ onCreated, onCancel }: { onCreated: () => v
   const [startsAt, setStartsAt] = useState("");
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [slotCount, setSlotCount] = useState(6);
+  const [slotDuration, setSlotDuration] = useState(15);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,10 +49,9 @@ export function NewAppointmentForm({ onCreated, onCancel }: { onCreated: () => v
       .then(({ data }) => setBriefs((data as BriefOption[]) ?? []));
   }, []);
 
-  const submit = async () => {
-    setError(null);
+  const submitSingle = async () => {
     if (!talentId || !startsAt) {
-      setError("Manjka talent ali datum/čas.");
+      setError(ad.appointmentMissingFields);
       return;
     }
     setSubmitting(true);
@@ -69,18 +71,65 @@ export function NewAppointmentForm({ onCreated, onCancel }: { onCreated: () => v
     onCreated();
   };
 
+  const submitSlots = async () => {
+    if (!briefId || !startsAt || slotCount < 1 || slotDuration < 1) {
+      setError(ad.appointmentMissingFields);
+      return;
+    }
+    setSubmitting(true);
+    const first = new Date(startsAt);
+    const rows = Array.from({ length: slotCount }).map((_, i) => {
+      const start = new Date(first.getTime() + i * slotDuration * 60000);
+      const end = new Date(start.getTime() + slotDuration * 60000);
+      return {
+        talent_id: null,
+        brief_id: briefId,
+        type,
+        starts_at: start.toISOString(),
+        ends_at: end.toISOString(),
+        location: location.trim() || null,
+        notes: notes.trim() || null,
+      };
+    });
+    const { error: insertError } = await supabase.from("appointment").insert(rows);
+    setSubmitting(false);
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+    onCreated();
+  };
+
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 18, marginBottom: 16 }}>
-      <Field label={ad.appointmentTalent}>
-        <select value={talentId} onChange={(e) => setTalentId(e.target.value)} style={inputStyle}>
-          <option value="">—</option>
-          {talents.map((tOpt) => (
-            <option key={tOpt.id} value={tOpt.id}>
-              {tOpt.first_name} {tOpt.last_name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <button
+          onClick={() => setMode("single")}
+          style={{ ...ghostBtn, ...(mode === "single" ? { borderColor: "var(--gold)", color: "var(--gold)" } : {}) }}
+        >
+          {ad.singleAppointment}
+        </button>
+        <button
+          onClick={() => setMode("slots")}
+          style={{ ...ghostBtn, ...(mode === "slots" ? { borderColor: "var(--gold)", color: "var(--gold)" } : {}) }}
+        >
+          {ad.generateSlots}
+        </button>
+      </div>
+
+      {mode === "single" && (
+        <Field label={ad.appointmentTalent}>
+          <select value={talentId} onChange={(e) => setTalentId(e.target.value)} style={inputStyle}>
+            <option value="">—</option>
+            {talents.map((tOpt) => (
+              <option key={tOpt.id} value={tOpt.id}>
+                {tOpt.first_name} {tOpt.last_name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+
       <div style={{ display: "flex", gap: 14 }}>
         <Field label="Tip">
           <select value={type} onChange={(e) => setType(e.target.value as AppointmentRow["type"])} style={inputStyle}>
@@ -91,14 +140,27 @@ export function NewAppointmentForm({ onCreated, onCancel }: { onCreated: () => v
             ))}
           </select>
         </Field>
-        <Field label={ad.appointmentStart}>
+        <Field label={mode === "single" ? ad.appointmentStart : ad.firstSlotStart}>
           <TextInput type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
         </Field>
       </div>
+
+      {mode === "slots" && (
+        <div style={{ display: "flex", gap: 14 }}>
+          <Field label={ad.slotCount}>
+            <TextInput type="number" min={1} max={50} value={slotCount} onChange={(e) => setSlotCount(Number(e.target.value))} />
+          </Field>
+          <Field label={ad.slotDuration}>
+            <TextInput type="number" min={5} max={240} value={slotDuration} onChange={(e) => setSlotDuration(Number(e.target.value))} />
+          </Field>
+        </div>
+      )}
+
       <Field label={ad.appointmentLocation}>
         <TextInput value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ljubljana, studio..." />
       </Field>
-      <Field label={ad.appointmentBrief}>
+
+      <Field label={mode === "single" ? ad.appointmentBrief : "Brief"}>
         <select value={briefId} onChange={(e) => setBriefId(e.target.value)} style={inputStyle}>
           <option value="">—</option>
           {briefs.map((b) => (
@@ -108,17 +170,25 @@ export function NewAppointmentForm({ onCreated, onCancel }: { onCreated: () => v
           ))}
         </select>
       </Field>
+
       <Field label={ad.appointmentNotes}>
         <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} />
       </Field>
+
+      {mode === "slots" && <p style={{ fontSize: 11.5, color: "var(--text-dim)", marginTop: -8, marginBottom: 12 }}>{ad.slotsHint}</p>}
+
       {error && (
         <div style={{ marginBottom: 12, padding: "10px 14px", background: "var(--red-bg)", borderRadius: 8, color: "var(--red)", fontSize: 13 }}>
           {error}
         </div>
       )}
       <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={submit} disabled={submitting} style={{ ...goldBtn, opacity: submitting ? 0.6 : 1 }}>
-          {ad.createAppointment}
+        <button
+          onClick={mode === "single" ? submitSingle : submitSlots}
+          disabled={submitting}
+          style={{ ...goldBtn, opacity: submitting ? 0.6 : 1 }}
+        >
+          {mode === "single" ? ad.createAppointment : ad.createSlots}
         </button>
         <button onClick={onCancel} style={ghostBtn}>
           {ad.cancel}

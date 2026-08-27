@@ -112,8 +112,8 @@ export function AppointmentsView() {
                     <Badge color="var(--text-light)" bg="var(--chip-bg)">
                       {ad.appointmentType[appt.type]}
                     </Badge>
-                    <div style={{ flex: 1, minWidth: 140, fontSize: 13.5, color: "var(--text)" }}>
-                      {talent ? `${talent.first_name} ${talent.last_name}` : "—"}
+                    <div style={{ flex: 1, minWidth: 140, fontSize: 13.5, color: talent ? "var(--text)" : "var(--text-dim)" }}>
+                      {talent ? `${talent.first_name} ${talent.last_name}` : ad.openSlot}
                       {brief && <span style={{ color: "var(--text-dim)" }}> · {brief.title}</span>}
                     </div>
                     {appt.location && (

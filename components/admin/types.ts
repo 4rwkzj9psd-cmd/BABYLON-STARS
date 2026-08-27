@@ -30,6 +30,7 @@ export interface BriefRow {
   deadline: string | null;
   status: "open" | "in_progress" | "closed";
   is_public: boolean;
+  casting_mode: "selfcast" | "audition" | "both";
   production?: ProductionRow | ProductionRow[] | null;
 }
 
@@ -61,7 +62,7 @@ export const PROPOSAL_STATUS_META: Record<ProposalRow["status"], { color: string
 
 export interface AppointmentRow {
   id: string;
-  talent_id: string;
+  talent_id: string | null;
   brief_id: string | null;
   type: "audition" | "callback" | "fitting" | "shoot" | "meeting" | "other";
   status: "scheduled" | "confirmed" | "completed" | "cancelled";

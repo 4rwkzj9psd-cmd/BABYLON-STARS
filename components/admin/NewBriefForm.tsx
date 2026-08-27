@@ -25,6 +25,7 @@ export function NewBriefForm({
   const [category, setCategory] = useState<string>("");
   const [deadline, setDeadline] = useState("");
   const [isPublic, setIsPublic] = useState(true);
+  const [castingMode, setCastingMode] = useState<"selfcast" | "audition" | "both">("selfcast");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +52,7 @@ export function NewBriefForm({
         category: category || null,
         deadline: deadline || null,
         is_public: isPublic,
+        casting_mode: castingMode,
       });
       if (briefError) throw briefError;
       onCreated();
@@ -105,6 +107,13 @@ export function NewBriefForm({
           <TextInput type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
         </Field>
       </div>
+      <Field label="Način castinga">
+        <select value={castingMode} onChange={(e) => setCastingMode(e.target.value as typeof castingMode)} style={inputStyle}>
+          <option value="selfcast">Samo selfcast</option>
+          <option value="audition">Samo avdicija (termin)</option>
+          <option value="both">Selfcast in avdicija</option>
+        </select>
+      </Field>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-light)", marginBottom: 16 }}>
         <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
         Javno objavljen (viden na strani "Odprti projekti")

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Loader2, Video, Check } from "lucide-react";
+import { Loader2, Video, Check, Clock } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
@@ -28,6 +28,7 @@ interface BriefRow {
   description: string | null;
   category: string | null;
   deadline: string | null;
+  casting_mode: "selfcast" | "audition" | "both";
   production: { company_name: string } | { company_name: string }[] | null;
 }
 
@@ -40,10 +41,21 @@ interface ProposalRow {
   self_tape_url: string | null;
 }
 
+interface SlotRow {
+  id: string;
+  starts_at: string;
+  location: string | null;
+}
+
 function productionName(p: BriefRow["production"]) {
   if (!p) return "";
   if (Array.isArray(p)) return p[0]?.company_name ?? "";
   return p.company_name;
+}
+
+function formatSlot(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" }) + " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
@@ -63,19 +75,23 @@ export function ProjectsView() {
   const [authTalent, setAuthTalent] = useState<{ id: string; name: string } | null>(null);
   const [briefs, setBriefs] = useState<BriefRow[]>([]);
   const [proposals, setProposals] = useState<ProposalRow[]>([]);
+  const [myAppointments, setMyAppointments] = useState<{ brief_id: string | null; starts_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [applyPanel, setApplyPanel] = useState<string | null>(null);
   const [tapeUrl, setTapeUrl] = useState("");
   const [uploadingTape, setUploadingTape] = useState(false);
+  const [slots, setSlots] = useState<SlotRow[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
 
   const effectiveTalentId = authTalent ? authTalent.id : talentId.trim();
 
   useEffect(() => {
     supabase
       .from("brief")
-      .select("id,title,description,category,deadline,production(company_name)")
+      .select("id,title,description,category,deadline,casting_mode,production(company_name)")
       .eq("is_public", true)
       .eq("status", "open")
       .order("deadline", { ascending: true })
@@ -116,6 +132,7 @@ export function ProjectsView() {
   const loadProposals = useCallback((id: string) => {
     if (!id) {
       setProposals([]);
+      setMyAppointments([]);
       return;
     }
     supabase
@@ -123,16 +140,38 @@ export function ProjectsView() {
       .select("id,talent_id,brief_id,status,notified_at,self_tape_url")
       .eq("talent_id", id)
       .then(({ data }) => setProposals((data as ProposalRow[] | null) ?? []));
+    supabase
+      .from("appointment")
+      .select("brief_id,starts_at")
+      .eq("talent_id", id)
+      .then(({ data }) => setMyAppointments(data ?? []));
   }, []);
 
   useEffect(() => {
     loadProposals(effectiveTalentId);
   }, [effectiveTalentId, loadProposals]);
 
-  const openApplyPanel = (briefId: string) => {
+  const loadSlots = useCallback((briefId: string) => {
+    setSlotsLoading(true);
+    supabase
+      .from("appointment")
+      .select("id,starts_at,location")
+      .eq("brief_id", briefId)
+      .is("talent_id", null)
+      .gte("starts_at", new Date().toISOString())
+      .order("starts_at", { ascending: true })
+      .then(({ data }) => {
+        setSlots((data as SlotRow[] | null) ?? []);
+        setSlotsLoading(false);
+      });
+  }, []);
+
+  const openApplyPanel = (brief: BriefRow) => {
     setError(null);
     setTapeUrl("");
-    setApplyPanel(briefId);
+    setSelectedSlot(null);
+    setApplyPanel(brief.id);
+    if (brief.casting_mode !== "selfcast") loadSlots(brief.id);
   };
 
   const handleTapeFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,12 +196,32 @@ export function ProjectsView() {
     setTapeUrl(publicUrlData.publicUrl);
   };
 
-  const applyToBrief = async (briefId: string) => {
+  const applyToBrief = async (brief: BriefRow) => {
     setError(null);
-    setApplying(briefId);
+
+    if (selectedSlot) {
+      const { data: claimed, error: claimError } = await supabase
+        .from("appointment")
+        .update({ talent_id: effectiveTalentId })
+        .eq("id", selectedSlot)
+        .is("talent_id", null)
+        .select("id");
+      if (claimError) {
+        setError(claimError.message);
+        return;
+      }
+      if (!claimed || claimed.length === 0) {
+        setError(p.slotTaken);
+        loadSlots(brief.id);
+        setSelectedSlot(null);
+        return;
+      }
+    }
+
+    setApplying(brief.id);
     const { error: insertError } = await supabase.from("proposal").insert({
       talent_id: effectiveTalentId,
-      brief_id: briefId,
+      brief_id: brief.id,
       origin: "talent",
       self_tape_url: tapeUrl.trim() || null,
     });
@@ -173,6 +232,7 @@ export function ProjectsView() {
     }
     setApplyPanel(null);
     setTapeUrl("");
+    setSelectedSlot(null);
     loadProposals(effectiveTalentId);
   };
 
@@ -255,6 +315,9 @@ export function ProjectsView() {
         {!loading && briefs.length === 0 && <div style={{ color: "var(--text-dim)", fontSize: 13.5 }}>{p.noProjects}</div>}
         {briefs.map((b) => {
           const mine = proposals.find((pr) => pr.brief_id === b.id);
+          const myAppointment = myAppointments.find((a) => a.brief_id === b.id);
+          const needsSlot = b.casting_mode === "audition" || b.casting_mode === "both";
+          const showTape = b.casting_mode === "selfcast" || b.casting_mode === "both";
           return (
             <div key={b.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 12, flexWrap: "wrap" }}>
@@ -272,6 +335,11 @@ export function ProjectsView() {
                   <Badge color={STATUS_COLORS[mine.status].color} bg={STATUS_COLORS[mine.status].bg}>
                     {statusLabel(mine.status)}
                   </Badge>
+                  {myAppointment && (
+                    <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--teal)" }}>
+                      <Clock size={13} /> {p.slotBooked(formatSlot(myAppointment.starts_at))}
+                    </span>
+                  )}
                   {mine.self_tape_url && (
                     <div style={{ maxWidth: 360, width: "100%" }}>
                       <SelfTape url={mine.self_tape_url} label={p.viewSelfTape} />
@@ -280,33 +348,70 @@ export function ProjectsView() {
                 </div>
               ) : applyPanel === b.id ? (
                 <div style={{ background: "var(--bg-hover)", borderRadius: 8, padding: 14, maxWidth: 420 }}>
-                  <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 8 }}>{p.selfTapeLabel}</div>
-                  <TextInput
-                    value={tapeUrl}
-                    onChange={(e) => setTapeUrl(e.target.value)}
-                    placeholder={p.selfTapePlaceholder}
-                    style={{ marginBottom: 8 }}
-                  />
-                  <label
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      fontSize: 11.5,
-                      color: "var(--gold)",
-                      cursor: "pointer",
-                      marginBottom: 12,
-                    }}
-                  >
-                    <Video size={13} />
-                    {uploadingTape ? p.uploadingTape : tapeUrl ? p.tapeReady : p.uploadTape}
-                    {tapeUrl && !uploadingTape && <Check size={13} color="var(--teal)" />}
-                    <input type="file" accept="video/*" onChange={handleTapeFile} disabled={uploadingTape} style={{ display: "none" }} />
-                  </label>
+                  {needsSlot && (
+                    <div style={{ marginBottom: showTape ? 16 : 12 }}>
+                      <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 8 }}>{p.pickSlotLabel}</div>
+                      {slotsLoading ? (
+                        <div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>{p.loading}</div>
+                      ) : slots.length === 0 ? (
+                        <div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>{p.noSlots}</div>
+                      ) : (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          {slots.map((s) => (
+                            <button
+                              key={s.id}
+                              onClick={() => setSelectedSlot(s.id === selectedSlot ? null : s.id)}
+                              style={{
+                                padding: "7px 12px",
+                                borderRadius: 20,
+                                fontSize: 12.5,
+                                cursor: "pointer",
+                                border: selectedSlot === s.id ? "1px solid var(--gold)" : "1px solid var(--input-border)",
+                                background: selectedSlot === s.id ? "var(--gold-dark-bg)" : "transparent",
+                                color: selectedSlot === s.id ? "var(--gold)" : "var(--text-light)",
+                              }}
+                            >
+                              {formatSlot(s.starts_at)}
+                              {s.location ? ` · ${s.location}` : ""}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {showTape && (
+                    <>
+                      <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 8 }}>{p.selfTapeLabel}</div>
+                      <TextInput
+                        value={tapeUrl}
+                        onChange={(e) => setTapeUrl(e.target.value)}
+                        placeholder={p.selfTapePlaceholder}
+                        style={{ marginBottom: 8 }}
+                      />
+                      <label
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: 11.5,
+                          color: "var(--gold)",
+                          cursor: "pointer",
+                          marginBottom: 12,
+                        }}
+                      >
+                        <Video size={13} />
+                        {uploadingTape ? p.uploadingTape : tapeUrl ? p.tapeReady : p.uploadTape}
+                        {tapeUrl && !uploadingTape && <Check size={13} color="var(--teal)" />}
+                        <input type="file" accept="video/*" onChange={handleTapeFile} disabled={uploadingTape} style={{ display: "none" }} />
+                      </label>
+                    </>
+                  )}
+
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       disabled={applying === b.id || uploadingTape}
-                      onClick={() => applyToBrief(b.id)}
+                      onClick={() => applyToBrief(b)}
                       style={{ ...goldBtn, opacity: applying === b.id || uploadingTape ? 0.6 : 1 }}
                     >
                       {p.applyBtn}
@@ -317,7 +422,7 @@ export function ProjectsView() {
                   </div>
                 </div>
               ) : (
-                <button onClick={() => openApplyPanel(b.id)} style={goldBtn}>
+                <button onClick={() => openApplyPanel(b)} style={goldBtn}>
                   {p.applyBtn}
                 </button>
               )}
