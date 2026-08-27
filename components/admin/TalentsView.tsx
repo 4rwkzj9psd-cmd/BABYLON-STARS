@@ -5,6 +5,7 @@ import { Search, ChevronRight, ChevronLeft, MapPin, Globe } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { Badge, TextInput, ghostBtn, inputStyle } from "@/components/ui/FormPrimitives";
+import { SelfTape } from "@/components/ui/SelfTape";
 import { TalentRow, STATUS_META } from "./types";
 
 function StatCard({ label, value }: { label: string; value: number | string }) {
@@ -120,6 +121,12 @@ export function TalentsView() {
             {selected.email || "—"} {selected.phone ? `· ${selected.phone}` : ""}
           </div>
         </div>
+        {selected.video_url && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 8 }}>Video / self-tape</div>
+            <SelfTape url={selected.video_url} label="Ogled videa" />
+          </div>
+        )}
         {selected.internal_notes && (
           <div style={{ marginTop: 16, background: "var(--bg-card)", borderRadius: 10, padding: 18 }}>
             <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 8 }}>Interne opombe</div>

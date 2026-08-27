@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { Badge, Field, TextInput, goldBtn, ghostBtn } from "@/components/ui/FormPrimitives";
 import { StarMark } from "@/components/layout/StarMark";
+import { SelfTape } from "@/components/ui/SelfTape";
 import { STATUS_META, PROPOSAL_STATUS_META, one } from "@/components/admin/types";
 
 interface TalentRow {
@@ -19,6 +20,7 @@ interface TalentRow {
   categories: string[];
   status: "submitted" | "in_review" | "represented" | "not_pursued" | "archived";
   photo_url: string | null;
+  video_url: string | null;
   email: string | null;
   created_at: string;
 }
@@ -112,7 +114,7 @@ function ProfileView({ session }: { session: Session }) {
     setLoading(true);
     let { data: ownTalents } = await supabase
       .from("talent")
-      .select("id,first_name,last_name,city,country,categories,status,photo_url,email,created_at")
+      .select("id,first_name,last_name,city,country,categories,status,photo_url,video_url,email,created_at")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false });
 
@@ -121,7 +123,7 @@ function ProfileView({ session }: { session: Session }) {
       await supabase.from("talent").update({ user_id: session.user.id }).is("user_id", null).eq("email", session.user.email);
       const retry = await supabase
         .from("talent")
-        .select("id,first_name,last_name,city,country,categories,status,photo_url,email,created_at")
+        .select("id,first_name,last_name,city,country,categories,status,photo_url,video_url,email,created_at")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
       ownTalents = retry.data;
@@ -212,6 +214,15 @@ function ProfileView({ session }: { session: Session }) {
           </div>
         </div>
       </div>
+
+      {primary.video_url && (
+        <section style={{ marginBottom: 32 }}>
+          <h2 style={{ fontFamily: "var(--font-fraunces), serif", fontSize: 17, fontWeight: 500, color: "var(--text)", marginBottom: 14 }}>
+            {p.myVideo}
+          </h2>
+          <SelfTape url={primary.video_url} label={p.watchVideo} />
+        </section>
+      )}
 
       <section style={{ marginBottom: 32 }}>
         <h2 style={{ fontFamily: "var(--font-fraunces), serif", fontSize: 17, fontWeight: 500, color: "var(--text)", marginBottom: 14 }}>

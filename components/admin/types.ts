@@ -8,6 +8,7 @@ export interface TalentRow {
   status: "submitted" | "in_review" | "represented" | "not_pursued" | "archived";
   source: "self_submitted" | "scouted";
   photo_url: string | null;
+  video_url: string | null;
   languages: string[] | null;
   email: string | null;
   phone: string | null;
