@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Check, Camera, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Camera, ArrowRight, X, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { StarMark } from "@/components/layout/StarMark";
@@ -30,8 +30,8 @@ interface FormState {
   city: string;
   country: string;
   categories: CategoryValue[];
-  photoFile: File | null;
-  photoPreview: string | null;
+  photoFiles: File[];
+  photoPreviews: string[];
   video: string;
   languages: string;
   skills: string;
@@ -49,8 +49,8 @@ const initialForm: FormState = {
   city: "",
   country: "",
   categories: [],
-  photoFile: null,
-  photoPreview: null,
+  photoFiles: [],
+  photoPreviews: [],
   video: "",
   languages: "",
   skills: "",
@@ -92,44 +92,79 @@ export function TalentApplication() {
   const canProceed = () => {
     if (step === 0) return form.firstName && form.lastName && form.dob && form.email && isValidEmail && form.city;
     if (step === 1) return form.categories.length > 0;
-    if (step === 2) return !!form.photoFile;
+    if (step === 2) return form.photoFiles.length > 0;
     if (step === 4) return form.consent1 && form.consent2;
     return true;
   };
 
   const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
+  const MAX_PHOTOS = 6;
 
-  const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setPhotoError(a.photoTypeError);
+  const handlePhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0) return;
+
+    const room = MAX_PHOTOS - form.photoFiles.length;
+    if (room <= 0) {
+      setPhotoError(a.photoMaxError);
       return;
     }
-    if (file.size > MAX_PHOTO_BYTES) {
-      setPhotoError(a.photoSizeError);
-      return;
+    const toAdd = files.slice(0, room);
+
+    for (const file of toAdd) {
+      if (!file.type.startsWith("image/")) {
+        setPhotoError(a.photoTypeError);
+        return;
+      }
+      if (file.size > MAX_PHOTO_BYTES) {
+        setPhotoError(a.photoSizeError);
+        return;
+      }
     }
     setPhotoError(null);
-    update("photoFile", file);
-    const reader = new FileReader();
-    reader.onload = () => update("photoPreview", reader.result as string);
-    reader.readAsDataURL(file);
+
+    Promise.all(
+      toAdd.map(
+        (file) =>
+          new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          })
+      )
+    ).then((previews) => {
+      setForm((f) => ({
+        ...f,
+        photoFiles: [...f.photoFiles, ...toAdd],
+        photoPreviews: [...f.photoPreviews, ...previews],
+      }));
+    });
+  };
+
+  const removePhoto = (index: number) => {
+    setForm((f) => ({
+      ...f,
+      photoFiles: f.photoFiles.filter((_, i) => i !== index),
+      photoPreviews: f.photoPreviews.filter((_, i) => i !== index),
+    }));
+    setPhotoError(null);
   };
 
   const handleSubmit = async () => {
     setSubmitting(true);
     setError(null);
     try {
-      let photoUrl: string | null = null;
-      if (form.photoFile) {
-        const ext = form.photoFile.name.split(".").pop();
+      const photoUrls: string[] = [];
+      for (const file of form.photoFiles) {
+        const ext = file.name.split(".").pop();
         const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error: uploadError } = await supabase.storage.from("talent-photos").upload(path, form.photoFile);
+        const { error: uploadError } = await supabase.storage.from("talent-photos").upload(path, file);
         if (uploadError) throw uploadError;
         const { data: publicUrlData } = supabase.storage.from("talent-photos").getPublicUrl(path);
-        photoUrl = publicUrlData.publicUrl;
+        photoUrls.push(publicUrlData.publicUrl);
       }
+      const photoUrl = photoUrls[0] ?? null;
 
       const newTalentId = crypto.randomUUID();
       const { error: insertError } = await supabase.from("talent").insert({
@@ -153,6 +188,13 @@ export function TalentApplication() {
         status: "submitted",
       });
       if (insertError) throw insertError;
+
+      if (photoUrls.length > 0) {
+        const { error: photosError } = await supabase.from("talent_photo").insert(
+          photoUrls.map((url, i) => ({ talent_id: newTalentId, url, sort_order: i }))
+        );
+        if (photosError) throw photosError;
+      }
 
       setTalentId(newTalentId);
       setSubmitted(true);
@@ -307,32 +349,79 @@ export function TalentApplication() {
         <div>
           <h2 style={sectionTitle}>{a.step2Title}</h2>
           <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 20 }}>{a.step2Sub}</p>
-          <label
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              height: 220,
-              border: "1px dashed var(--border-light)",
-              borderRadius: 12,
-              cursor: "pointer",
-              background: form.photoPreview ? "none" : "var(--bg-hover)",
-              backgroundImage: form.photoPreview ? `url(${form.photoPreview})` : "none",
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              overflow: "hidden",
-            }}
-          >
-            {!form.photoPreview && (
-              <>
-                <Camera size={26} color="var(--text-dim)" />
-                <span style={{ color: "var(--text-dim)", fontSize: 13 }}>{a.uploadPhoto}</span>
-              </>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            {form.photoPreviews.map((src, i) => (
+              <div key={i} style={{ position: "relative", aspectRatio: "1", borderRadius: 10, overflow: "hidden" }}>
+                <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                {i === 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      bottom: 6,
+                      left: 6,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      color: "#14131a",
+                      background: "var(--gold)",
+                      padding: "2px 7px",
+                      borderRadius: 4,
+                    }}
+                  >
+                    {a.mainPhoto}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removePhoto(i)}
+                  aria-label={a.removePhoto}
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    right: 6,
+                    width: 22,
+                    height: 22,
+                    borderRadius: "50%",
+                    border: "none",
+                    background: "rgba(15,14,19,0.75)",
+                    color: "var(--text)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            {form.photoFiles.length < MAX_PHOTOS && (
+              <label
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  aspectRatio: "1",
+                  border: "1px dashed var(--border-light)",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  background: "var(--bg-hover)",
+                }}
+              >
+                {form.photoFiles.length === 0 ? (
+                  <Camera size={22} color="var(--text-dim)" />
+                ) : (
+                  <Plus size={20} color="var(--text-dim)" />
+                )}
+                <span style={{ color: "var(--text-dim)", fontSize: 11.5, textAlign: "center", padding: "0 6px" }}>{a.uploadPhoto}</span>
+                <input type="file" accept="image/*" multiple onChange={handlePhotos} style={{ display: "none" }} />
+              </label>
             )}
-            <input type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
-          </label>
+          </div>
+          <p style={{ fontSize: 11.5, color: "var(--text-dim)", marginTop: 10 }}>{a.photoHint}</p>
           {photoError && <div style={{ fontSize: 12.5, color: "var(--red)", marginTop: 8 }}>{photoError}</div>}
           <div style={{ marginTop: 20 }}>
             <Field label={a.video}>

@@ -6,7 +6,10 @@ import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { Badge, TextInput, ghostBtn, inputStyle } from "@/components/ui/FormPrimitives";
 import { SelfTape } from "@/components/ui/SelfTape";
+import { PhotoGallery } from "@/components/ui/PhotoGallery";
 import { TalentRow, STATUS_META } from "./types";
+
+const CATEGORY_VALUES = ["actor", "model", "performer", "character_face", "animal_talent", "no_experience"] as const;
 
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
@@ -24,6 +27,8 @@ export function TalentsView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<TalentRow | null>(null);
 
@@ -42,6 +47,8 @@ export function TalentsView() {
 
   const filtered = talents.filter((tRow) => {
     if (statusFilter !== "all" && tRow.status !== statusFilter) return false;
+    if (categoryFilter !== "all" && !(tRow.categories || []).includes(categoryFilter)) return false;
+    if (sourceFilter !== "all" && tRow.source !== sourceFilter) return false;
     const q = search.toLowerCase();
     if (q && !`${tRow.first_name} ${tRow.last_name} ${tRow.city}`.toLowerCase().includes(q)) return false;
     return true;
@@ -70,11 +77,7 @@ export function TalentsView() {
           <ChevronLeft size={15} /> {ad.backToList}
         </button>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-          {selected.photo_url ? (
-            <img src={selected.photo_url} alt="" style={{ width: 120, height: 120, borderRadius: 12, objectFit: "cover" }} />
-          ) : (
-            <div style={{ width: 120, height: 120, borderRadius: 12, background: "var(--chip-bg)" }} />
-          )}
+          <PhotoGallery talentId={selected.id} fallbackUrl={selected.photo_url} size={100} />
           <div style={{ flex: 1, minWidth: 220 }}>
             <h2 style={{ fontFamily: "var(--font-fraunces), serif", fontSize: 24, color: "var(--text)", marginBottom: 6, fontWeight: 500 }}>
               {selected.first_name} {selected.last_name}
@@ -156,6 +159,19 @@ export function TalentsView() {
               {label}
             </option>
           ))}
+        </select>
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={{ ...inputStyle, width: 170 }}>
+          <option value="all">{ad.allCategories}</option>
+          {CATEGORY_VALUES.map((c) => (
+            <option key={c} value={c}>
+              {t.apply.categories[c]}
+            </option>
+          ))}
+        </select>
+        <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} style={{ ...inputStyle, width: 150 }}>
+          <option value="all">{ad.allSources}</option>
+          <option value="self_submitted">{ad.sourceSelf}</option>
+          <option value="scouted">{ad.sourceScouted}</option>
         </select>
         <button onClick={loadTalents} style={{ ...ghostBtn, fontSize: 11 }}>
           {ad.refresh}

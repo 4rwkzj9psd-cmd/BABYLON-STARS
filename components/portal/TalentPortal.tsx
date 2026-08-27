@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { Badge, Field, TextInput, goldBtn, ghostBtn } from "@/components/ui/FormPrimitives";
 import { StarMark } from "@/components/layout/StarMark";
 import { SelfTape } from "@/components/ui/SelfTape";
+import { PhotoGallery } from "@/components/ui/PhotoGallery";
 import { STATUS_META, PROPOSAL_STATUS_META, one } from "@/components/admin/types";
 
 interface TalentRow {
@@ -214,6 +215,13 @@ function ProfileView({ session }: { session: Session }) {
           </div>
         </div>
       </div>
+
+      <section style={{ marginBottom: 32 }}>
+        <h2 style={{ fontFamily: "var(--font-fraunces), serif", fontSize: 17, fontWeight: 500, color: "var(--text)", marginBottom: 14 }}>
+          {p.myPhotos}
+        </h2>
+        <PhotoGallery talentId={primary.id} fallbackUrl={primary.photo_url} size={90} />
+      </section>
 
       {primary.video_url && (
         <section style={{ marginBottom: 32 }}>
