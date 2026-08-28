@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { LogIn } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
@@ -48,6 +49,12 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: () => void }) {
         {loading ? ad.loggingIn : ad.loginBtn}
       </button>
       <div style={{ fontSize: 11.5, color: "var(--placeholder)", marginTop: 16, textAlign: "center" }}>{ad.loginHint}</div>
+      <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 20, textAlign: "center" }}>
+        Nova agencija?{" "}
+        <Link href="/signup" style={{ color: "var(--gold)" }}>
+          Registriraj se
+        </Link>
+      </div>
     </div>
   );
 }

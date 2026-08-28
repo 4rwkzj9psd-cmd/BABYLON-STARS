@@ -30,5 +30,5 @@ export default function AdminPage() {
     );
   }
 
-  return session ? <AdminPanel onLogout={() => setSession(null)} /> : <AdminLogin onLoggedIn={() => {}} />;
+  return session ? <AdminPanel session={session} onLogout={() => setSession(null)} /> : <AdminLogin onLoggedIn={() => {}} />;
 }

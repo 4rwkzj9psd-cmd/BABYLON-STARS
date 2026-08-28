@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { LayoutDashboard, Briefcase, CalendarDays, MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
@@ -10,6 +11,13 @@ import { TalentsView } from "./TalentsView";
 import { BriefsView } from "./BriefsView";
 import { AppointmentsView } from "./AppointmentsView";
 import { MessagesView } from "./MessagesView";
+import { CompleteAgencySetup } from "./CompleteAgencySetup";
+import { BillingGate } from "./BillingGate";
+
+interface AgencyRow {
+  subscription_status: "trialing" | "active" | "past_due" | "canceled";
+  trial_ends_at: string;
+}
 
 function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
   return (
@@ -34,15 +42,53 @@ function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode; labe
   );
 }
 
-export function AdminPanel({ onLogout }: { onLogout: () => void }) {
+export function AdminPanel({ session, onLogout }: { session: Session; onLogout: () => void }) {
   const { t } = useI18n();
   const ad = t.admin;
   const [tab, setTab] = useState<"talents" | "briefs" | "calendar" | "messages">("talents");
+  const [agency, setAgency] = useState<AgencyRow | null>(null);
+  const [checkingAgency, setCheckingAgency] = useState(true);
+
+  const isStaff = session.user.app_metadata?.role === "staff";
+
+  useEffect(() => {
+    if (!isStaff) {
+      setCheckingAgency(false);
+      return;
+    }
+    supabase
+      .from("agency")
+      .select("subscription_status,trial_ends_at")
+      .single()
+      .then(({ data }) => {
+        setAgency((data as AgencyRow) ?? null);
+        setCheckingAgency(false);
+      });
+  }, [isStaff]);
 
   const logout = async () => {
     await supabase.auth.signOut();
     onLogout();
   };
+
+  if (!isStaff) {
+    return <CompleteAgencySetup onDone={() => window.location.reload()} />;
+  }
+
+  if (checkingAgency) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", padding: "120px 0" }}>
+        <StarMark size={28} />
+      </div>
+    );
+  }
+
+  if (agency) {
+    const trialExpired = agency.subscription_status === "trialing" && new Date(agency.trial_ends_at) < new Date();
+    if (trialExpired) return <BillingGate reason="trial_expired" onLogout={logout} />;
+    if (agency.subscription_status === "past_due") return <BillingGate reason="past_due" onLogout={logout} />;
+    if (agency.subscription_status === "canceled") return <BillingGate reason="canceled" onLogout={logout} />;
+  }
 
   return (
     <div style={{ display: "flex", minHeight: 640 }}>

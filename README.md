@@ -97,9 +97,41 @@ The schema now supports more than one agency, each fully isolated by RLS:
   the talent (vs. `proposal.agency_id`, the brief's own agency) whenever those differ — that's the data a
   future billing/commission feature needs; Phase 0 only records it, it doesn't calculate or invoice anything.
 - The public site and talent-facing flows (`/`, `/apply`, `/projects`, `/talent-discovery`,
-  `/for-productions`) are still single-tenant in this phase — they're explicitly scoped to one agency via
-  the `NEXT_PUBLIC_AGENCY_ID` (web) / `EXPO_PUBLIC_AGENCY_ID` (mobile) env var. Self-serve agency signup,
-  billing, and per-agency public pages are follow-up phases, not built yet.
+  `/for-productions`) are still single-tenant — they're explicitly scoped to one agency via the
+  `NEXT_PUBLIC_AGENCY_ID` (web) / `EXPO_PUBLIC_AGENCY_ID` (mobile) env var. Per-agency public pages are a
+  follow-up phase, not built yet.
+
+## Self-serve signup & billing (Phase 1)
+
+New agencies register themselves at `/signup` (name + email + password → `create_agency_and_become_owner()`
+RPC → 14-day free trial, no card required). `AdminPanel` checks the caller's own `agency` row on every
+load: if the trial has expired or the subscription isn't `active`, it shows a billing gate instead of the
+normal tabs (same check in the mobile admin layout). If someone is authenticated but isn't staff of any
+agency yet (e.g. they had to confirm their email before a session existed), `AdminPanel` shows a short
+"finish setting up your agency" form instead of an empty admin panel.
+
+**Required setup before the Stripe part actually works** — none of this is needed for signup/trial/RLS,
+only for taking payment:
+
+1. Create a Stripe account (free) and grab a **test** `Secret key` from Developers → API keys.
+2. Add three **server-only** env vars in Vercel (Project → Settings → Environment Variables) — never commit
+   them, and they don't need the `NEXT_PUBLIC_` prefix since the Stripe routes run server-side
+   (`app/api/stripe/*`):
+   - `STRIPE_SECRET_KEY` — from step 1.
+   - `STRIPE_MONTHLY_PRICE_EUR_CENTS` — the actual price to charge, e.g. `4900` for €49/month (defaults to
+     that placeholder if unset — change it before going live).
+   - `SUPABASE_SERVICE_ROLE_KEY` — Supabase Dashboard → Settings → API. Used only by the webhook route
+     (`app/api/stripe/webhook/route.ts`), which isn't acting as any logged-in user so it needs to bypass RLS
+     to write the payment result back onto `agency`.
+3. After deploying, add a webhook endpoint in the Stripe Dashboard pointing at
+   `https://<your-domain>/api/stripe/webhook`, subscribed to `checkout.session.completed`,
+   `customer.subscription.updated`, and `customer.subscription.deleted`. Copy the signing secret it gives you
+   into `STRIPE_WEBHOOK_SECRET` (also server-only, in Vercel).
+4. Test with Stripe's test card `4242 4242 4242 4242`, any future expiry, any CVC.
+
+This sandbox has no network access to `api.stripe.com` (same restriction as Supabase/Vercel), so the
+checkout/webhook code is verified by review + types only, not run end-to-end — please test the actual
+payment flow yourself once the keys above are in place.
 
 ## Known limitations (carried over from the schema/tech-plan)
 
