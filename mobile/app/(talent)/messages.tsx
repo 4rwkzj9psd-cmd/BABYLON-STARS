@@ -4,6 +4,7 @@ import { Send } from "lucide-react-native";
 import { Input, EmptyState } from "@/components/ui/Primitives";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+import { AGENCY_ID } from "@/lib/agency";
 import { colors } from "@/lib/theme";
 
 interface MessageRow {
@@ -47,7 +48,7 @@ export default function MessagesScreen() {
     setSending(true);
     const body = draft.trim();
     setDraft("");
-    await supabase.from("message").insert({ talent_id: talentId, sender: "talent", body });
+    await supabase.from("message").insert({ talent_id: talentId, agency_id: AGENCY_ID, sender: "talent", body });
     setSending(false);
   };
 

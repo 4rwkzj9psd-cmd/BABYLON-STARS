@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2, Video, Check, Clock } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
+import { AGENCY_ID } from "@/lib/agency";
 import { useI18n } from "@/lib/i18n/context";
 import { Badge, TextInput, goldBtn, ghostBtn } from "@/components/ui/FormPrimitives";
 import { SelfTape } from "@/components/ui/SelfTape";
@@ -92,6 +93,7 @@ export function ProjectsView() {
     supabase
       .from("brief")
       .select("id,title,description,category,deadline,casting_mode,production(company_name)")
+      .eq("agency_id", AGENCY_ID)
       .eq("is_public", true)
       .eq("status", "open")
       .order("deadline", { ascending: true })

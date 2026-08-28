@@ -7,9 +7,29 @@ import { useI18n } from "@/lib/i18n/context";
 import { Badge, TextInput, ghostBtn, inputStyle } from "@/components/ui/FormPrimitives";
 import { SelfTape } from "@/components/ui/SelfTape";
 import { PhotoGallery } from "@/components/ui/PhotoGallery";
-import { TalentRow, STATUS_META } from "./types";
+import { AgencyTalentRow, STATUS_META, one } from "./types";
 
 const CATEGORY_VALUES = ["actor", "model", "performer", "character_face", "animal_talent", "no_experience"] as const;
+
+// Flattened view model: this agency's CRM row (status/source/notes) merged with the talent's
+// own global profile (name/photos/contact), for convenient rendering in this list/detail view.
+interface TalentListItem {
+  agencyTalentId: string;
+  talentId: string;
+  status: AgencyTalentRow["status"];
+  source: AgencyTalentRow["source"];
+  internal_notes: string | null;
+  first_name: string;
+  last_name: string;
+  city: string;
+  country: string | null;
+  categories: string[];
+  photo_url: string | null;
+  video_url: string | null;
+  languages: string[] | null;
+  email: string | null;
+  phone: string | null;
+}
 
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
@@ -23,21 +43,52 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
 export function TalentsView() {
   const { t } = useI18n();
   const ad = t.admin;
-  const [talents, setTalents] = useState<TalentRow[]>([]);
+  const [talents, setTalents] = useState<TalentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<TalentRow | null>(null);
+  const [selected, setSelected] = useState<TalentListItem | null>(null);
 
   const loadTalents = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    const { data, error } = await supabase.from("talent").select("*").order("created_at", { ascending: false });
-    if (error) setLoadError(error.message);
-    else setTalents((data as TalentRow[]) ?? []);
+    const { data, error } = await supabase
+      .from("agency_talent")
+      .select(
+        "id,talent_id,status,source,internal_notes,talent(id,first_name,last_name,city,country,categories,photo_url,video_url,languages,email,phone,created_at)"
+      )
+      .order("created_at", { ascending: false });
+    if (error) {
+      setLoadError(error.message);
+    } else {
+      const rows = ((data as AgencyTalentRow[]) ?? [])
+        .map((row): TalentListItem | null => {
+          const talent = one(row.talent);
+          if (!talent) return null;
+          return {
+            agencyTalentId: row.id,
+            talentId: row.talent_id,
+            status: row.status,
+            source: row.source,
+            internal_notes: row.internal_notes,
+            first_name: talent.first_name,
+            last_name: talent.last_name,
+            city: talent.city,
+            country: talent.country,
+            categories: talent.categories,
+            photo_url: talent.photo_url,
+            video_url: talent.video_url,
+            languages: talent.languages,
+            email: talent.email,
+            phone: talent.phone,
+          };
+        })
+        .filter((row): row is TalentListItem => row !== null);
+      setTalents(rows);
+    }
     setLoading(false);
   }, []);
 
@@ -54,10 +105,10 @@ export function TalentsView() {
     return true;
   });
 
-  const updateStatus = async (id: string, status: TalentRow["status"]) => {
-    setTalents((ts) => ts.map((tRow) => (tRow.id === id ? { ...tRow, status } : tRow)));
-    setSelected((s) => (s && s.id === id ? { ...s, status } : s));
-    const { error } = await supabase.from("talent").update({ status }).eq("id", id);
+  const updateStatus = async (agencyTalentId: string, status: AgencyTalentRow["status"]) => {
+    setTalents((ts) => ts.map((tRow) => (tRow.agencyTalentId === agencyTalentId ? { ...tRow, status } : tRow)));
+    setSelected((s) => (s && s.agencyTalentId === agencyTalentId ? { ...s, status } : s));
+    const { error } = await supabase.from("agency_talent").update({ status }).eq("id", agencyTalentId);
     if (error) {
       alert(`${ad.loadError} ${error.message}`);
       loadTalents();
@@ -77,7 +128,7 @@ export function TalentsView() {
           <ChevronLeft size={15} /> {ad.backToList}
         </button>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-          <PhotoGallery talentId={selected.id} fallbackUrl={selected.photo_url} size={100} />
+          <PhotoGallery talentId={selected.talentId} fallbackUrl={selected.photo_url} size={100} />
           <div style={{ flex: 1, minWidth: 220 }}>
             <h2 style={{ fontFamily: "var(--font-fraunces), serif", fontSize: 24, color: "var(--text)", marginBottom: 6, fontWeight: 500 }}>
               {selected.first_name} {selected.last_name}
@@ -103,7 +154,7 @@ export function TalentsView() {
               <span style={{ fontSize: 12, color: "var(--text-dim)" }}>Status:</span>
               <select
                 value={selected.status}
-                onChange={(e) => updateStatus(selected.id, e.target.value as TalentRow["status"])}
+                onChange={(e) => updateStatus(selected.agencyTalentId, e.target.value as AgencyTalentRow["status"])}
                 style={{ ...inputStyle, width: 180, padding: "6px 10px" }}
               >
                 {Object.entries(ad.status).map(([k, label]) => (
@@ -191,7 +242,7 @@ export function TalentsView() {
             const st = STATUS_META[tRow.status];
             return (
               <div
-                key={tRow.id}
+                key={tRow.agencyTalentId}
                 onClick={() => setSelected(tRow)}
                 style={{
                   display: "flex",

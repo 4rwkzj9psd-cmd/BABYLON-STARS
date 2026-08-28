@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Check, Camera, ArrowRight, X, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { AGENCY_ID } from "@/lib/agency";
 import { useI18n } from "@/lib/i18n/context";
 import { StarMark } from "@/components/layout/StarMark";
 import {
@@ -164,39 +165,28 @@ export function TalentApplication() {
         const { data: publicUrlData } = supabase.storage.from("talent-photos").getPublicUrl(path);
         photoUrls.push(publicUrlData.publicUrl);
       }
-      const photoUrl = photoUrls[0] ?? null;
 
-      const newTalentId = crypto.randomUUID();
-      const { error: insertError } = await supabase.from("talent").insert({
-        id: newTalentId,
-        first_name: form.firstName,
-        last_name: form.lastName,
-        date_of_birth: form.dob,
-        email: form.email,
-        phone: form.phone,
-        city: form.city,
-        country: form.country,
-        categories: form.categories,
-        photo_url: photoUrl,
-        video_url: form.video || null,
-        languages: form.languages ? form.languages.split(",").map((s) => s.trim()) : [],
-        skills: form.skills ? form.skills.split(",").map((s) => s.trim()) : [],
-        availability: form.availability || null,
-        consent_general: form.consent1,
-        consent_photo_video: form.consent2,
-        source: "self_submitted",
-        status: "submitted",
+      const { data: newTalentId, error: rpcError } = await supabase.rpc("apply_as_talent", {
+        p_agency_id: AGENCY_ID,
+        p_first_name: form.firstName,
+        p_last_name: form.lastName,
+        p_date_of_birth: form.dob,
+        p_email: form.email,
+        p_phone: form.phone,
+        p_city: form.city,
+        p_country: form.country,
+        p_categories: form.categories,
+        p_video_url: form.video || null,
+        p_languages: form.languages ? form.languages.split(",").map((s) => s.trim()) : [],
+        p_skills: form.skills ? form.skills.split(",").map((s) => s.trim()) : [],
+        p_availability: form.availability || null,
+        p_consent_general: form.consent1,
+        p_consent_photo_video: form.consent2,
+        p_photo_urls: photoUrls,
       });
-      if (insertError) throw insertError;
+      if (rpcError) throw rpcError;
 
-      if (photoUrls.length > 0) {
-        const { error: photosError } = await supabase.from("talent_photo").insert(
-          photoUrls.map((url, i) => ({ talent_id: newTalentId, url, sort_order: i }))
-        );
-        if (photosError) throw photosError;
-      }
-
-      setTalentId(newTalentId);
+      setTalentId(newTalentId as string);
       setSubmitted(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

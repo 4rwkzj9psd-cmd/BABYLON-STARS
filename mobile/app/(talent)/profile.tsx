@@ -3,6 +3,7 @@ import { Image, Linking as RNLinking, ScrollView, StyleSheet, Text, View } from 
 import { Badge, Card, GhostButton, SectionTitle, EmptyState } from "@/components/ui/Primitives";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+import { AGENCY_ID } from "@/lib/agency";
 import { colors, statusMeta, proposalStatusMeta } from "@/lib/theme";
 
 interface TalentRow {
@@ -11,7 +12,6 @@ interface TalentRow {
   last_name: string;
   city: string;
   country: string | null;
-  status: string;
   photo_url: string | null;
   video_url: string | null;
 }
@@ -60,6 +60,7 @@ export default function ProfileScreen() {
   const { talentId, talentFirstName, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [talent, setTalent] = useState<TalentRow | null>(null);
+  const [relationshipStatus, setRelationshipStatus] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoRow[]>([]);
   const [proposals, setProposals] = useState<ProposalRow[]>([]);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
@@ -67,8 +68,9 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     if (!talentId) return;
     setLoading(true);
-    const [{ data: t }, { data: ph }, { data: props }, { data: docs }] = await Promise.all([
-      supabase.from("talent").select("id,first_name,last_name,city,country,status,photo_url,video_url").eq("id", talentId).single(),
+    const [{ data: t }, { data: rel }, { data: ph }, { data: props }, { data: docs }] = await Promise.all([
+      supabase.from("talent").select("id,first_name,last_name,city,country,photo_url,video_url").eq("id", talentId).single(),
+      supabase.from("agency_talent").select("status").eq("agency_id", AGENCY_ID).eq("talent_id", talentId).maybeSingle(),
       supabase.from("talent_photo").select("id,url").eq("talent_id", talentId).order("sort_order"),
       supabase
         .from("proposal")
@@ -78,6 +80,7 @@ export default function ProfileScreen() {
       supabase.from("document").select("id,type,status,signed_file_url").eq("talent_id", talentId).order("created_at", { ascending: false }),
     ]);
     setTalent(t as TalentRow | null);
+    setRelationshipStatus((rel as { status: string } | null)?.status ?? null);
     setPhotos((ph as PhotoRow[]) ?? []);
     setProposals((props as ProposalRow[]) ?? []);
     setDocuments((docs as DocumentRow[]) ?? []);
@@ -100,7 +103,7 @@ export default function ProfileScreen() {
   }
 
   const displayPhotos = photos.length > 0 ? photos.map((p) => p.url) : talent?.photo_url ? [talent.photo_url] : [];
-  const st = talent ? statusMeta[talent.status] : null;
+  const st = relationshipStatus ? statusMeta[relationshipStatus] : null;
 
   return (
     <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
@@ -117,11 +120,11 @@ export default function ProfileScreen() {
         <GhostButton title="Odjava" onPress={signOut} />
       </View>
 
-      {st && talent && (
+      {st && relationshipStatus && (
         <Badge color={st.color} bg={st.bg}>
           {{ submitted: "Prijavljen", in_review: "V pregledu", represented: "Predstavljan", not_pursued: "Ni ustrezal", archived: "Arhiviran" }[
-            talent.status
-          ] ?? talent.status}
+            relationshipStatus
+          ] ?? relationshipStatus}
         </Badge>
       )}
 

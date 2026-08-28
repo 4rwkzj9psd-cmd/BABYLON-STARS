@@ -15,7 +15,7 @@ Native mobile app (Expo / React Native) for Babylon Stars, synced with the same 
 ```bash
 cd mobile
 npm install
-cp .env.example .env   # fill in the Supabase URL + anon key (same project as the web app)
+cp .env.example .env   # fill in the Supabase URL, anon key, and AGENCY_ID (same project as the web app)
 npx expo start
 ```
 
@@ -33,7 +33,7 @@ babylonstars://
 
 Without this, `supabase.auth.signInWithOtp` will send a magic-link email, but tapping it will not return the user to the app.
 
-Admin/staff accounts use email + password and must have `app_metadata.role = "staff"` set (same requirement as the web app — see the root `README.md` for how to set this via the Supabase Dashboard or SQL). `user_metadata` does **not** work since it's user-editable and RLS policies gate on `app_metadata` only.
+Admin/staff accounts use email + password and must be added to their agency via an `agency_member` row (which auto-stamps `app_metadata.role = "staff"` and `app_metadata.agency_id` — see "Multi-tenant platform" in the root `README.md`). `user_metadata` does **not** work since it's user-editable and RLS policies gate on `app_metadata` only.
 
 ## App structure
 

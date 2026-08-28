@@ -1,3 +1,4 @@
+// Global talent profile (shared across every agency the talent has a relationship with).
 export interface TalentRow {
   id: string;
   first_name: string;
@@ -5,15 +6,25 @@ export interface TalentRow {
   city: string;
   country: string | null;
   categories: string[];
-  status: "submitted" | "in_review" | "represented" | "not_pursued" | "archived";
-  source: "self_submitted" | "scouted";
   photo_url: string | null;
   video_url: string | null;
   languages: string[] | null;
   email: string | null;
   phone: string | null;
-  internal_notes: string | null;
   created_at: string;
+}
+
+// One agency's private CRM relationship with a (global) talent -- status, source and internal
+// notes are per-agency, not part of the talent's own global profile.
+export interface AgencyTalentRow {
+  id: string;
+  agency_id: string;
+  talent_id: string;
+  status: "submitted" | "in_review" | "represented" | "not_pursued" | "archived";
+  source: "self_submitted" | "scouted";
+  internal_notes: string | null;
+  shareable_with_network: boolean;
+  talent?: TalentRow | TalentRow[] | null;
 }
 
 export interface ProductionRow {
@@ -45,7 +56,7 @@ export interface ProposalRow {
   talent?: TalentRow | TalentRow[] | null;
 }
 
-export const STATUS_META: Record<TalentRow["status"], { color: string; bg: string }> = {
+export const STATUS_META: Record<AgencyTalentRow["status"], { color: string; bg: string }> = {
   submitted: { color: "var(--text-muted)", bg: "var(--chip-bg)" },
   in_review: { color: "var(--gold)", bg: "var(--gold-dark-bg)" },
   represented: { color: "var(--teal)", bg: "var(--teal-bg)" },

@@ -5,23 +5,34 @@ import { Badge, Card, GhostButton, SectionTitle } from "@/components/ui/Primitiv
 import { supabase } from "@/lib/supabase";
 import { colors, statusMeta } from "@/lib/theme";
 
-interface TalentRow {
+interface TalentInfo {
   id: string;
   first_name: string;
   last_name: string;
   city: string;
   country: string | null;
   categories: string[];
-  status: string;
   email: string | null;
   phone: string | null;
   video_url: string | null;
+}
+
+interface AgencyTalentDetail {
+  id: string;
+  talent_id: string;
+  status: string;
   internal_notes: string | null;
+  talent: TalentInfo | TalentInfo[] | null;
 }
 
 interface PhotoRow {
   id: string;
   url: string;
+}
+
+function one<T>(v: T | T[] | null): T | null {
+  if (!v) return null;
+  return Array.isArray(v) ? v[0] ?? null : v;
 }
 
 const STATUS_VALUES = ["submitted", "in_review", "represented", "not_pursued", "archived"];
@@ -34,30 +45,36 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function TalentDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const [talent, setTalent] = useState<TalentRow | null>(null);
+  const { id: agencyTalentId } = useLocalSearchParams<{ id: string }>();
+  const [row, setRow] = useState<AgencyTalentDetail | null>(null);
   const [photos, setPhotos] = useState<PhotoRow[]>([]);
 
   const load = useCallback(async () => {
-    const [{ data: t }, { data: ph }] = await Promise.all([
-      supabase.from("talent").select("*").eq("id", id).single(),
-      supabase.from("talent_photo").select("id,url").eq("talent_id", id).order("sort_order"),
-    ]);
-    setTalent(t as TalentRow | null);
-    setPhotos((ph as PhotoRow[]) ?? []);
-  }, [id]);
+    const { data: at } = await supabase
+      .from("agency_talent")
+      .select("id,talent_id,status,internal_notes,talent(id,first_name,last_name,city,country,categories,email,phone,video_url)")
+      .eq("id", agencyTalentId)
+      .single();
+    setRow(at as AgencyTalentDetail | null);
+    const talentId = one((at as AgencyTalentDetail | null)?.talent ?? null)?.id;
+    if (talentId) {
+      const { data: ph } = await supabase.from("talent_photo").select("id,url").eq("talent_id", talentId).order("sort_order");
+      setPhotos((ph as PhotoRow[]) ?? []);
+    }
+  }, [agencyTalentId]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const updateStatus = async (status: string) => {
-    setTalent((t) => (t ? { ...t, status } : t));
-    await supabase.from("talent").update({ status }).eq("id", id);
+    setRow((r) => (r ? { ...r, status } : r));
+    await supabase.from("agency_talent").update({ status }).eq("id", agencyTalentId);
   };
 
-  if (!talent) return null;
-  const st = statusMeta[talent.status];
+  const talent = row ? one(row.talent) : null;
+  if (!row || !talent) return null;
+  const st = statusMeta[row.status];
 
   return (
     <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
@@ -91,7 +108,7 @@ export default function TalentDetailScreen() {
         ))}
       </View>
       <Badge color={st.color} bg={st.bg}>
-        {STATUS_LABEL[talent.status]}
+        {STATUS_LABEL[row.status]}
       </Badge>
 
       <View style={{ height: 20 }} />
@@ -109,12 +126,12 @@ export default function TalentDetailScreen() {
         </>
       )}
 
-      {talent.internal_notes && (
+      {row.internal_notes && (
         <>
           <View style={{ height: 16 }} />
           <Card>
             <Text style={styles.contactLabel}>Interne opombe</Text>
-            <Text style={styles.contactValue}>{talent.internal_notes}</Text>
+            <Text style={styles.contactValue}>{row.internal_notes}</Text>
           </Card>
         </>
       )}

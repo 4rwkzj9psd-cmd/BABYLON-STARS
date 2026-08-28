@@ -6,7 +6,7 @@ Backend: Supabase (`gsatusmewafhkkhbtawi`, eu-central-1).
 ## Getting started
 
 ```bash
-cp .env.example .env.local   # fill in Supabase URL + anon key
+cp .env.example .env.local   # fill in Supabase URL, anon key, and NEXT_PUBLIC_AGENCY_ID
 npm install
 npm run dev
 ```
@@ -20,22 +20,29 @@ Open [http://localhost:3000](http://localhost:3000).
    link email will redirect but Supabase will reject it.
 2. **Authentication → Providers → Email**: confirm "Email OTP" / magic link is enabled (on by default).
 
-### Required: mark admin/staff accounts
+### Required: add admin/staff accounts to their agency
 
-Every admin user (created via Authentication → Users → Add user) **must** have `{"role": "staff"}` set on
-their **app metadata** (not user metadata — that's user-editable). All "staff full access" RLS policies
-check this (`is_staff()` in the DB), not just "is logged in" — a talent's `/portal` session is authenticated
-too, and without this check they'd be able to read/write every other talent's data. Set it via:
+The platform is multi-tenant (see "Multi-tenant platform" below): every "staff full access" RLS policy
+checks both `role = "staff"` **and** `agency_id` on the user's **app metadata** (not user metadata — that's
+user-editable), not just "is logged in" — a talent's `/portal` session is authenticated too, and without
+this check they'd be able to read/write every other talent's (and every other agency's) data.
+
+App metadata is **not** set by hand anymore — create the user (Authentication → Users → Add user), then add
+them to their agency, and a DB trigger stamps `role`/`agency_id` onto their account automatically:
 
 ```sql
-update auth.users set raw_app_meta_data =
-  raw_app_meta_data || '{"role":"staff"}'::jsonb
-where email = 'admin@example.com';
+insert into agency_member (agency_id, user_id, role)
+values (
+  (select id from agency where slug = 'babylon-stars'),
+  (select id from auth.users where email = 'admin@example.com'),
+  'owner'  -- or 'admin' / 'member'
+);
 ```
 
-or in the dashboard: Authentication → Users → (user) → edit raw app metadata. Do this for every admin
-account before they log into `/admin` — without it, `/admin` will look logged-in but every query will
-come back empty (RLS silently filters everything out, which is the safe failure mode).
+Do this for every admin account before they log into `/admin` — without it, `/admin` will look logged-in
+but every query will come back empty (RLS silently filters everything out, which is the safe failure mode).
+If their session was already open when you add them, they need to log out and back in (or the app needs to
+call `supabase.auth.refreshSession()`) to pick up the new token claims.
 
 ## Structure
 
@@ -64,9 +71,35 @@ come back empty (RLS silently filters everything out, which is the safe failure 
 Each brief has a `casting_mode`: `selfcast` (default), `audition`, or `both`. Admin sets it in
 `NewBriefForm`. For briefs needing an audition, admin generates open slots (`AppointmentsView` → "Generate
 open slots" — a start time + duration + count, all with `talent_id = null`). On `/projects`, applying to
-such a brief shows the open slots; picking one claims it via a guarded `UPDATE ... WHERE talent_id IS NULL`
-(RLS enforces the guard too), so two people can't book the same slot — whoever's update lands first wins,
-the other sees "that slot was just taken" and picks again.
+such a brief shows the open slots; picking one claims it via the `claim_open_slot(p_slot_id, p_talent_id)`
+SECURITY DEFINER RPC (not a plain client-side `UPDATE`), which does a guarded `UPDATE ... WHERE talent_id IS
+NULL` inside the function — so two people can't book the same slot, and the caller doesn't need read access
+to the slot's row after claiming it (a plain client-side update+select ran into an RLS/RETURNING gotcha
+here; see the git history if curious). Whoever's claim lands first wins; the other gets `false` back and
+picks again.
+
+## Multi-tenant platform (Phase 0)
+
+The schema now supports more than one agency, each fully isolated by RLS:
+
+- `agency` / `agency_member` — the tenant and its staff. Staff RLS checks `agency_id = staff_agency_id()`,
+  which reads the JWT's `app_metadata.agency_id` (stamped automatically when a row is added to
+  `agency_member` — see above).
+- `talent` is a **global profile** shared across every agency a person has applied to or been scouted by —
+  it holds only identity/contact/portfolio fields. Per-agency CRM data (status, source, internal notes,
+  whether the talent is marked shareable) lives in `agency_talent`, one row per (agency, talent) pair.
+  Applying via `/apply` goes through the `apply_as_talent(...)` RPC, which looks up an existing global
+  profile by email before creating a new one, so the same person applying to a second agency later reuses
+  their profile instead of duplicating it.
+- **Talent sharing / commission tracking**: an agency can mark its relationship with a talent
+  `shareable_with_network = true`, making that talent visible to other agencies' staff (read-only) so they
+  can propose them to their own briefs. `proposal.owning_agency_id` records which agency actually represents
+  the talent (vs. `proposal.agency_id`, the brief's own agency) whenever those differ — that's the data a
+  future billing/commission feature needs; Phase 0 only records it, it doesn't calculate or invoice anything.
+- The public site and talent-facing flows (`/`, `/apply`, `/projects`, `/talent-discovery`,
+  `/for-productions`) are still single-tenant in this phase — they're explicitly scoped to one agency via
+  the `NEXT_PUBLIC_AGENCY_ID` (web) / `EXPO_PUBLIC_AGENCY_ID` (mobile) env var. Self-serve agency signup,
+  billing, and per-agency public pages are follow-up phases, not built yet.
 
 ## Known limitations (carried over from the schema/tech-plan)
 

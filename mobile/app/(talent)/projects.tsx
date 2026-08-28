@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-nativ
 import { Badge, Card, GoldButton, GhostButton, Input, EmptyState } from "@/components/ui/Primitives";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+import { AGENCY_ID } from "@/lib/agency";
 import { colors, proposalStatusMeta } from "@/lib/theme";
 
 interface BriefRow {
@@ -60,6 +61,7 @@ export default function ProjectsScreen() {
     const { data } = await supabase
       .from("brief")
       .select("id,title,description,category,deadline,casting_mode,production(company_name)")
+      .eq("agency_id", AGENCY_ID)
       .eq("is_public", true)
       .eq("status", "open")
       .order("deadline", { ascending: true });

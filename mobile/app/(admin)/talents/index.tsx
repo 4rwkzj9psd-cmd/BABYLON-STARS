@@ -5,8 +5,26 @@ import { Badge, Input, EmptyState } from "@/components/ui/Primitives";
 import { supabase } from "@/lib/supabase";
 import { colors, statusMeta } from "@/lib/theme";
 
-interface TalentRow {
+interface TalentInfo {
   id: string;
+  first_name: string;
+  last_name: string;
+  city: string;
+  country: string | null;
+  categories: string[];
+  photo_url: string | null;
+}
+
+interface AgencyTalentRow {
+  id: string;
+  talent_id: string;
+  status: string;
+  talent: TalentInfo | TalentInfo[] | null;
+}
+
+interface TalentListItem {
+  agencyTalentId: string;
+  talentId: string;
   first_name: string;
   last_name: string;
   city: string;
@@ -14,6 +32,11 @@ interface TalentRow {
   categories: string[];
   status: string;
   photo_url: string | null;
+}
+
+function one<T>(v: T | T[] | null): T | null {
+  if (!v) return null;
+  return Array.isArray(v) ? v[0] ?? null : v;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -25,14 +48,34 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function TalentsListScreen() {
-  const [talents, setTalents] = useState<TalentRow[]>([]);
+  const [talents, setTalents] = useState<TalentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from("talent").select("*").order("created_at", { ascending: false });
-    setTalents((data as TalentRow[]) ?? []);
+    const { data } = await supabase
+      .from("agency_talent")
+      .select("id,talent_id,status,talent(id,first_name,last_name,city,country,categories,photo_url)")
+      .order("created_at", { ascending: false });
+    const rows = ((data as AgencyTalentRow[]) ?? [])
+      .map((row): TalentListItem | null => {
+        const talent = one(row.talent);
+        if (!talent) return null;
+        return {
+          agencyTalentId: row.id,
+          talentId: row.talent_id,
+          status: row.status,
+          first_name: talent.first_name,
+          last_name: talent.last_name,
+          city: talent.city,
+          country: talent.country,
+          categories: talent.categories,
+          photo_url: talent.photo_url,
+        };
+      })
+      .filter((row): row is TalentListItem => row !== null);
+    setTalents(rows);
     setLoading(false);
   }, []);
 
@@ -63,13 +106,13 @@ export default function TalentsListScreen() {
       </View>
       <FlatList
         data={filtered}
-        keyExtractor={(t) => t.id}
+        keyExtractor={(t) => t.agencyTalentId}
         contentContainerStyle={{ padding: 16, paddingTop: 8 }}
         ListEmptyComponent={loading ? <ActivityIndicator color={colors.gold} /> : <EmptyState>Ni zadetkov.</EmptyState>}
         renderItem={({ item }) => {
           const st = statusMeta[item.status];
           return (
-            <Pressable style={styles.row} onPress={() => router.push(`/(admin)/talents/${item.id}`)}>
+            <Pressable style={styles.row} onPress={() => router.push(`/(admin)/talents/${item.agencyTalentId}`)}>
               {item.photo_url ? (
                 <Image source={{ uri: item.photo_url }} style={styles.avatar} />
               ) : (

@@ -5,12 +5,13 @@ import type { Session } from "@supabase/supabase-js";
 import Link from "next/link";
 import { ChevronRight, MapPin, FileText, Loader2, Send, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { AGENCY_ID } from "@/lib/agency";
 import { useI18n } from "@/lib/i18n/context";
 import { Badge, Field, TextInput, goldBtn, ghostBtn } from "@/components/ui/FormPrimitives";
 import { StarMark } from "@/components/layout/StarMark";
 import { SelfTape } from "@/components/ui/SelfTape";
 import { PhotoGallery } from "@/components/ui/PhotoGallery";
-import { STATUS_META, PROPOSAL_STATUS_META, one } from "@/components/admin/types";
+import { STATUS_META, PROPOSAL_STATUS_META, AgencyTalentRow, one } from "@/components/admin/types";
 
 interface TalentRow {
   id: string;
@@ -19,7 +20,6 @@ interface TalentRow {
   city: string;
   country: string | null;
   categories: string[];
-  status: "submitted" | "in_review" | "represented" | "not_pursued" | "archived";
   photo_url: string | null;
   video_url: string | null;
   email: string | null;
@@ -126,6 +126,7 @@ function ProfileView({ session }: { session: Session }) {
   const ad = t.admin;
   const [loading, setLoading] = useState(true);
   const [talents, setTalents] = useState<TalentRow[]>([]);
+  const [relationshipStatus, setRelationshipStatus] = useState<AgencyTalentRow["status"] | null>(null);
   const [proposals, setProposals] = useState<ProposalRow[]>([]);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
@@ -138,7 +139,7 @@ function ProfileView({ session }: { session: Session }) {
     setLoading(true);
     let { data: ownTalents } = await supabase
       .from("talent")
-      .select("id,first_name,last_name,city,country,categories,status,photo_url,video_url,email,created_at")
+      .select("id,first_name,last_name,city,country,categories,photo_url,video_url,email,created_at")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false });
 
@@ -147,7 +148,7 @@ function ProfileView({ session }: { session: Session }) {
       await supabase.from("talent").update({ user_id: session.user.id }).is("user_id", null).eq("email", session.user.email);
       const retry = await supabase
         .from("talent")
-        .select("id,first_name,last_name,city,country,categories,status,photo_url,video_url,email,created_at")
+        .select("id,first_name,last_name,city,country,categories,photo_url,video_url,email,created_at")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
       ownTalents = retry.data;
@@ -157,7 +158,8 @@ function ProfileView({ session }: { session: Session }) {
 
     const ids = (ownTalents ?? []).map((t) => t.id);
     if (ids.length > 0) {
-      const [{ data: proposalData }, { data: documentData }, { data: appointmentData }, { data: messageData }] = await Promise.all([
+      const [{ data: relationship }, { data: proposalData }, { data: documentData }, { data: appointmentData }, { data: messageData }] = await Promise.all([
+        supabase.from("agency_talent").select("status").eq("agency_id", AGENCY_ID).eq("talent_id", ids[0]).maybeSingle(),
         supabase
           .from("proposal")
           .select("id,talent_id,status,notified_at,self_tape_url,brief(title,deadline,production(company_name))")
@@ -170,8 +172,9 @@ function ProfileView({ session }: { session: Session }) {
           .in("talent_id", ids)
           .gte("starts_at", new Date().toISOString())
           .order("starts_at", { ascending: true }),
-        supabase.from("message").select("*").in("talent_id", ids).order("created_at", { ascending: true }),
+        supabase.from("message").select("*").in("talent_id", ids).eq("agency_id", AGENCY_ID).order("created_at", { ascending: true }),
       ]);
+      setRelationshipStatus((relationship as { status: AgencyTalentRow["status"] } | null)?.status ?? null);
       setProposals((proposalData as ProposalRow[]) ?? []);
       setDocuments((documentData as DocumentRow[]) ?? []);
       setAppointments((appointmentData as AppointmentRow[]) ?? []);
@@ -212,7 +215,7 @@ function ProfileView({ session }: { session: Session }) {
     setSending(true);
     const body = draft.trim();
     setDraft("");
-    await supabase.from("message").insert({ talent_id: talentId, sender: "talent", body });
+    await supabase.from("message").insert({ talent_id: talentId, agency_id: AGENCY_ID, sender: "talent", body });
     setSending(false);
   };
 
@@ -247,7 +250,7 @@ function ProfileView({ session }: { session: Session }) {
     );
   }
 
-  const st = STATUS_META[primary.status];
+  const st = relationshipStatus ? STATUS_META[relationshipStatus] : null;
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px 90px" }}>
@@ -273,9 +276,11 @@ function ProfileView({ session }: { session: Session }) {
               {primary.city}
               {primary.country ? `, ${primary.country}` : ""}
             </span>
-            <Badge color={st.color} bg={st.bg}>
-              {ad.status[primary.status]}
-            </Badge>
+            {st && relationshipStatus && (
+              <Badge color={st.color} bg={st.bg}>
+                {ad.status[relationshipStatus]}
+              </Badge>
+            )}
           </div>
         </div>
       </div>
