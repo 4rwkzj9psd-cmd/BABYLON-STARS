@@ -53,7 +53,6 @@ export default function CalendarScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
     const [{ data: a }, { data: b }] = await Promise.all([
       supabase.from("appointment").select("*,talent(id,first_name,last_name),brief(id,title)").order("starts_at", { ascending: true }),
       supabase.from("brief").select("id,title").order("created_at", { ascending: false }),
@@ -65,6 +64,18 @@ export default function CalendarScreen() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-appointments")
+      .on("postgres_changes", { event: "*", schema: "public", table: "appointment" }, () => {
+        load();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [load]);
 
   const generateSlots = async () => {

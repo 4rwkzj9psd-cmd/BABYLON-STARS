@@ -28,7 +28,6 @@ export function AppointmentsView() {
   const [showNewForm, setShowNewForm] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
     const { data } = await supabase
       .from("appointment")
       .select("*,talent(id,first_name,last_name,photo_url),brief(id,title)")
@@ -39,6 +38,18 @@ export function AppointmentsView() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-appointments")
+      .on("postgres_changes", { event: "*", schema: "public", table: "appointment" }, () => {
+        load();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [load]);
 
   const updateStatus = async (id: string, status: AppointmentRow["status"]) => {
