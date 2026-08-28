@@ -200,17 +200,15 @@ export function ProjectsView() {
     setError(null);
 
     if (selectedSlot) {
-      const { data: claimed, error: claimError } = await supabase
-        .from("appointment")
-        .update({ talent_id: effectiveTalentId })
-        .eq("id", selectedSlot)
-        .is("talent_id", null)
-        .select("id");
+      const { data: claimed, error: claimError } = await supabase.rpc("claim_open_slot", {
+        p_slot_id: selectedSlot,
+        p_talent_id: effectiveTalentId,
+      });
       if (claimError) {
         setError(claimError.message);
         return;
       }
-      if (!claimed || claimed.length === 0) {
+      if (!claimed) {
         setError(p.slotTaken);
         loadSlots(brief.id);
         setSelectedSlot(null);

@@ -130,17 +130,15 @@ export default function ProjectsScreen() {
     setError(null);
 
     if (selectedSlot) {
-      const { data: claimed, error: claimErr } = await supabase
-        .from("appointment")
-        .update({ talent_id: talentId })
-        .eq("id", selectedSlot)
-        .is("talent_id", null)
-        .select("id");
+      const { data: claimed, error: claimErr } = await supabase.rpc("claim_open_slot", {
+        p_slot_id: selectedSlot,
+        p_talent_id: talentId,
+      });
       if (claimErr) {
         setError(claimErr.message);
         return;
       }
-      if (!claimed || claimed.length === 0) {
+      if (!claimed) {
         setError("Ta termin je bil pravkar zaseden — izberi drugega.");
         openApply(brief);
         return;
